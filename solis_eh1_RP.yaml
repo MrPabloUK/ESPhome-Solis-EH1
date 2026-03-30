@@ -133,7 +133,7 @@ packages:
   # | >>> DEBUG
   # +------------------------------------------------------------------------------+
 
-      - path: 'packages/misc/misc_fan_controller.yaml'
+      - path: 'packages/base/device_base_esp32_debug.yaml'
         vars:
           debug_name: 'Debug'
           debug_update_interval: '5s'
