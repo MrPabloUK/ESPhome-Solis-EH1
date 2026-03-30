@@ -1,0 +1,98 @@
+blueprint:
+  name: "Solis: Create/Edit Schedule"
+  description: >
+    Create or update a Solis inverter schedule slot via ESPHome.
+    Configure the ESPHome action prefix to match your device
+    (e.g. `solisinverter_inverter1` for the default hostname).
+  domain: script
+  source_url: https://raw.githubusercontent.com/MrPabloUK/ESPhome-Solis-EH1/main/home_assistant/blueprints/solis_schedule_manager.yaml
+  input:
+    device_prefix:
+      name: ESPHome Action Prefix
+      description: >
+        The prefix used for ESPHome actions in Home Assistant.
+        Found under Developer Tools → Actions, search for `esphome`.
+        For a device named `solisinverter` with inverter ID 1, this is
+        `solisinverter_inverter1`.
+      default: solisinverter_inverter1
+      selector:
+        text: {}
+
+variables:
+  _device_prefix: !input device_prefix
+
+fields:
+  slot_num:
+    name: Slot Number
+    description: Select slot (1-12). Slot 1 has the highest priority.
+    required: true
+    default: 1
+    selector:
+      number:
+        min: 1
+        max: 12
+        mode: box
+  op_mode:
+    name: Operation Mode
+    required: true
+    default: '1'
+    selector:
+      select:
+        options:
+        - label: Charge
+          value: '1'
+        - label: Discharge
+          value: '2'
+  start_t:
+    name: Start Time
+    required: true
+    default: 00:00:00
+    selector:
+      time: {}
+  end_t:
+    name: End Time
+    required: true
+    default: 00:00:00
+    selector:
+      time: {}
+  target_soc:
+    name: Target SOC
+    description: Charge or discharge to this state of charge.
+    required: true
+    default: 100
+    selector:
+      number:
+        min: 10
+        max: 100
+        unit_of_measurement: '%'
+  limit_watts:
+    name: Power Limit
+    description: Set to 0 for unlimited power.
+    required: true
+    default: 0
+    selector:
+      number:
+        min: 0
+        max: 6000
+        unit_of_measurement: W
+  repeat_day:
+    name: Repeat Daily
+    required: true
+    default: false
+    selector:
+      boolean: {}
+
+sequence:
+- action: "esphome.{{ _device_prefix }}_upsert_schedule"
+  data:
+    Slot_Number: '{{ slot_num | int }}'
+    Operation_Mode: '{{ op_mode | int }}'
+    Start_Hour: '{{ start_t.split('':'')[0] | int }}'
+    Start_Minute: '{{ start_t.split('':'')[1] | int }}'
+    End_Hour: '{{ end_t.split('':'')[0] | int }}'
+    End_Minute: '{{ end_t.split('':'')[1] | int }}'
+    Target_SOC_Percent: '{{ target_soc | int }}'
+    Power_Limit_Watts: '{{ limit_watts | int }}'
+    Repeat_Daily: '{{ repeat_day }}'
+
+mode: single

@@ -1,0 +1,55 @@
+blueprint:
+  name: "Solis: Schedule Slot Control"
+  description: >
+    Pause, resume, or delete a Solis inverter schedule slot via ESPHome.
+    Configure the ESPHome action prefix to match your device
+    (e.g. `solisinverter_inverter1` for the default hostname).
+  domain: script
+  source_url: https://raw.githubusercontent.com/MrPabloUK/ESPhome-Solis-EH1/main/home_assistant/blueprints/solis_schedule_slot_control.yaml
+  input:
+    device_prefix:
+      name: ESPHome Action Prefix
+      description: >
+        The prefix used for ESPHome actions in Home Assistant.
+        Found under Developer Tools → Actions, search for `esphome`.
+        For a device named `solisinverter` with inverter ID 1, this is
+        `solisinverter_inverter1`.
+      default: solisinverter_inverter1
+      selector:
+        text: {}
+
+variables:
+  _device_prefix: !input device_prefix
+
+fields:
+  action_type:
+    name: Action
+    required: true
+    default: reactivate
+    selector:
+      select:
+        options:
+        - label: Resume
+          value: reactivate
+        - label: Pause
+          value: disable
+        - label: Delete
+          value: delete
+  slot_num:
+    name: Slot Number
+    required: true
+    default: 1
+    selector:
+      number:
+        min: 1
+        max: 12
+        mode: box
+
+sequence:
+- action: "esphome.{{ _device_prefix }}_manage_slot_status"
+  data:
+    Slot_Number: '{{ slot_num | int }}'
+    Instruction: '{% set mapper = {''delete'': 0, ''disable'': 1, ''reactivate'':
+      2} %} {{ mapper[action_type] }}'
+
+mode: single

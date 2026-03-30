@@ -1,0 +1,10 @@
+- trigger:
+    - trigger: event
+      event_type: esphome.solis_inverter1_schedule_update
+  sensor:
+    - name: "Solis Master Schedule"
+      unique_id: solis_master_schedule
+      state: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}" # Shows last update time
+      attributes:
+        # This stores the actual JSON object
+        data: "{{ trigger.event.data.schedules | from_json }}"
