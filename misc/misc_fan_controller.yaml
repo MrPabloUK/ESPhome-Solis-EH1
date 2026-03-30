@@ -1,0 +1,122 @@
+# Updated : 2026.01.22
+# Version : 1.0.0
+# GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
+
+# Solis EH1 Controller
+
+# This YAML is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
+
+substitutions:
+  equipment_type: ""
+  equipment_id: 0
+  temperature_source: inverter_temp
+
+# If you turn this on, you can manually set the fan speed.
+# The PID will be ignored. This is done via the proxy_output.
+fan:
+  - platform: speed
+    id: ${equipment_type}${equipment_id}_manual_fan_control
+    output: ${equipment_type}${equipment_id}_proxy_output
+    name: "Manual Fan Speed"
+    device_id: ${equipment_type}_${equipment_id}
+
+output:
+  # ledc is the name of the pwm output system on an esp32
+  - platform: ledc
+    id: ${equipment_type}${equipment_id}_esp_fan
+    pin: ${pwm_pin}
+    # 25KHz is standard PC fan frequency, minimises buzzing
+    frequency: "25000 Hz"
+    min_power: 0%
+    max_power: 100%
+
+  # This proxy output takes its input
+  # if the manual fan control is on, use the level from that
+  # otherwise use the PID control value.
+  # Then publish the result to the fan (ledc) and
+  # also publish to the template output sensor
+  - platform: template
+    id: ${equipment_type}${equipment_id}_proxy_output
+    type: float
+    write_action:
+      lambda: |-
+        float write_val = 0;
+        if(id(${equipment_type}${equipment_id}_manual_fan_control).state) {
+          write_val = id(${equipment_type}${equipment_id}_manual_fan_control).speed / 100.0;
+          id(${equipment_type}${equipment_id}_esp_fan).set_level(write_val);
+        } else {
+          write_val = state*1.0;
+          id(${equipment_type}${equipment_id}_esp_fan).set_level(write_val);
+        }
+        id(${equipment_type}${equipment_id}_fan_speed_pwm).publish_state(write_val*100.0);
+
+# Expose a PID-controlled Thermostat
+# Manual: https://esphome.io/components/climate/pid.html
+climate:
+  - platform: pid
+    name: "Fan Thermostat"
+    id: ${equipment_type}${equipment_id}_inverter_thermostat
+    device_id: ${equipment_type}_${equipment_id}
+    sensor: ${equipment_type}${equipment_id}_${temperature_source}
+
+    default_target_temperature: 45°C
+    cool_output: ${equipment_type}${equipment_id}_proxy_output
+
+    # The extents of the HA Thermostat
+    visual:
+      min_temperature: 30 °C
+      max_temperature: 60 °C
+
+    # See the README for setting up these parameters.
+    # These are over ridden by the number templates above.
+    control_parameters:
+      kp: 0.2
+      ki: 0.0015
+      kd: 0
+      max_integral: 0.0
+      output_averaging_samples: 1
+      derivative_averaging_samples: 5
+
+    # How to behave when close to the target temperature?
+    deadband_parameters:
+      threshold_high: 0.0°C
+      threshold_low: -0.0°C
+      kp_multiplier: 0.0
+      ki_multiplier: 0.04
+      kd_multiplier: 0.0
+      deadband_output_averaging_samples: 15
+
+sensor:
+  # Every time the fan speed is updated, this sensor will
+  # also be updated for displaying on the frontend.
+  # See proxy_output.
+  - platform: template
+    name: "Fan Speed Percentage"
+    unit_of_measurement: "%"
+    id: ${equipment_type}${equipment_id}_fan_speed_pwm
+    device_id: ${equipment_type}_${equipment_id}
+
+  # Fan sensors
+  - platform: pulse_counter
+    pin:
+      number: ${pulse_pin}
+      mode: INPUT_PULLUP
+    unit_of_measurement: "RPM"
+    id: ${equipment_type}${equipment_id}_fan_speed_rpm
+    device_id: ${equipment_type}_${equipment_id}
+    name: Fan Speed
+    accuracy_decimals: 0
+    update_interval: 1s
+    filters:
+      - multiply: 0.5

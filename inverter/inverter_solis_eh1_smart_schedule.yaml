@@ -1,0 +1,481 @@
+# Updated : 2026.01.22
+# Version : 1.0.0
+# GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
+
+# Solis EH1 Controller
+
+# This YAML is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
+
+substitutions:
+  slot_count: 12 # Count of schedule slots
+  inverter_max_power: 6000 # Rated inverter power in watts
+  battery_soc: "inverter${inverter_id}_battery_soc" # id of the battery SOC sensor
+  battery_power: "inverter${inverter_id}_battery_power" # id of the battery power sensor
+
+esphome:
+  on_boot:
+    - priority: -100.0
+      then:
+        - wait_until:
+            api.connected:
+        - delay: 5s
+        - script.execute: inverter${inverter_id}_push_schedules_to_ha
+
+api:
+  actions:
+    - action: inverter${inverter_id}_upsert_schedule
+      variables:
+        Slot_Number: int # User enters 1-12
+        Start_Hour: int # 0-23
+        Start_Minute: int # 0-59
+        End_Hour: int # 0-23
+        End_Minute: int # 0-59
+        Operation_Mode: int # 1=Charge, 2=Discharge
+        Power_Limit_Watts: int # 0-6000
+        Target_SOC_Percent: int # 0-100
+        Repeat_Daily: bool # true/false
+      then:
+        - if:
+            condition:
+              lambda: |-
+                // Validation using human-readable names
+                if (Slot_Number < 1 || Slot_Number > ${slot_count}) return true;
+                if (Start_Hour < 0 || Start_Hour > 23 || Start_Minute < 0 || Start_Minute > 59) return true;
+                if (End_Hour < 0 || End_Hour > 23 || End_Minute < 0 || End_Minute > 59) return true;
+                if (Target_SOC_Percent < 0 || Target_SOC_Percent > 100) return true;
+                if (Operation_Mode < 1 || Operation_Mode > 2) return true;
+                if (Power_Limit_Watts < 0 || Power_Limit_Watts > ${inverter_max_power}) return true;
+                return false;
+            then:
+              - api.respond:
+                  success: false
+                  error_message: "Validation failed. Ensure Slot number within range, Time is 24h format, and SOC is 0-100."
+            else:
+              - lambda: |-
+                  // Mapping UI (1-12) to Array (0-11)
+                  int i = Slot_Number - 1; 
+                  id(inverter${inverter_id}_s_active)[i] = true;
+                  id(inverter${inverter_id}_s_start_mins)[i] = (Start_Hour * 60) + Start_Minute;
+                  id(inverter${inverter_id}_s_end_mins)[i] = (End_Hour * 60) + End_Minute;
+                  id(inverter${inverter_id}_s_mode)[i] = (uint8_t)Operation_Mode;
+                  id(inverter${inverter_id}_s_power)[i] = Power_Limit_Watts;
+                  id(inverter${inverter_id}_s_target_soc)[i] = Target_SOC_Percent;
+                  id(inverter${inverter_id}_s_repeat)[i] = Repeat_Daily;
+                  id(inverter${inverter_id}_s_was_active)[i] = false;
+              - script.execute: inverter${inverter_id}_push_schedules_to_ha
+              - api.respond: { success: true }
+
+    - action: inverter${inverter_id}_manage_slot_status
+      variables:
+        Slot_Number: int
+        Instruction: int # 0=Delete, 1=Disable, 2=Reactivate
+      then:
+        - lambda: |-
+            int i = Slot_Number - 1;
+            if (Instruction == 0) id(inverter${inverter_id}_wipe_slot).execute(i);
+            else if (Instruction == 1) id(inverter${inverter_id}_s_active)[i] = false;
+            else if (Instruction == 2) id(inverter${inverter_id}_s_active)[i] = true;
+            id(inverter${inverter_id}_s_was_active)[i] = false;
+        - script.execute: inverter${inverter_id}_push_schedules_to_ha
+
+# ==============================================================================
+# GLOBAL STORAGE & SHADOW REGISTERS
+# ==============================================================================
+
+globals:
+  - id: inverter${inverter_id}_s_active
+    type: bool[${slot_count}]
+    restore_value: yes
+  - id: inverter${inverter_id}_s_start_mins
+    type: int[${slot_count}]
+    restore_value: yes
+  - id: inverter${inverter_id}_s_end_mins
+    type: int[${slot_count}]
+    restore_value: yes
+  - id: inverter${inverter_id}_s_mode
+    type: uint8_t[${slot_count}]
+    restore_value: yes
+  - id: inverter${inverter_id}_s_target_soc
+    type: int[${slot_count}]
+    restore_value: yes
+  - id: inverter${inverter_id}_s_power
+    type: int[${slot_count}]
+    restore_value: yes
+  - id: inverter${inverter_id}_s_repeat
+    type: bool[${slot_count}]
+    restore_value: yes
+  - id: inverter${inverter_id}_s_was_active
+    type: bool[${slot_count}]
+    restore_value: no
+
+  # Shadow Registers: Initialized to -1 to prevent premature writes on boot
+  - id: inverter${inverter_id}_shadow_f_chg
+    type: int
+    initial_value: "-1"
+  - id: inverter${inverter_id}_shadow_f_dis
+    type: int
+    initial_value: "-1"
+  - id: inverter${inverter_id}_shadow_r_chg
+    type: int
+    initial_value: "-1"
+  - id: inverter${inverter_id}_shadow_r_dis
+    type: int
+    initial_value: "-1"
+  - id: inverter${inverter_id}_shadow_mode
+    type: int
+    initial_value: "-1"
+
+script:
+  - id: inverter${inverter_id}_wipe_slot
+    parameters:
+      slot_id: int
+    then:
+      - lambda: |-
+          id(inverter${inverter_id}_s_active)[slot_id] = false;
+          id(inverter${inverter_id}_s_start_mins)[slot_id] = 0;
+          id(inverter${inverter_id}_s_end_mins)[slot_id] = 0;
+          id(inverter${inverter_id}_s_mode)[slot_id] = 0;
+          id(inverter${inverter_id}_s_power)[slot_id] = 0;
+          id(inverter${inverter_id}_s_target_soc)[slot_id] = 0;
+          id(inverter${inverter_id}_s_repeat)[slot_id] = false;
+          id(inverter${inverter_id}_s_was_active)[slot_id] = false;
+      - script.execute: inverter${inverter_id}_push_schedules_to_ha
+
+  - id: inverter${inverter_id}_push_schedules_to_ha
+    then:
+      - homeassistant.event:
+          event: esphome.solis_inverter${inverter_id}_schedule_update
+          data_template:
+            schedules: !lambda |-
+              std::string json = "[";
+              for (int i = 0; i < ${slot_count}; i++) {
+                std::string mode_str = "Idle";
+                if (id(inverter${inverter_id}_s_mode)[i] == 1) mode_str = "Charge";
+                else if (id(inverter${inverter_id}_s_mode)[i] == 2) mode_str = "Discharge";
+
+                int s_h = id(inverter${inverter_id}_s_start_mins)[i] / 60;
+                int s_m = id(inverter${inverter_id}_s_start_mins)[i] % 60;
+                int e_h = id(inverter${inverter_id}_s_end_mins)[i] / 60;
+                int e_m = id(inverter${inverter_id}_s_end_mins)[i] % 60;
+
+                char buf[160];
+                snprintf(buf, sizeof(buf), 
+                  "{\"Slot\":%d,\"Active\":%s,\"Mode\":\"%s\",\"Start Time\":\"%02d:%02d\",\"End Time\":\"%02d:%02d\",\"Target SOC\":%d,\"Power\":%d,\"Repeat\":%s}",
+                  i + 1, // Shift UI output to 1-12
+                  id(inverter${inverter_id}_s_active)[i] ? "true" : "false", 
+                  mode_str.c_str(), 
+                  s_h, s_m, e_h, e_m,
+                  id(inverter${inverter_id}_s_target_soc)[i], id(inverter${inverter_id}_s_power)[i], 
+                  id(inverter${inverter_id}_s_repeat)[i] ? "true" : "false"
+                );
+                json += buf;
+                if (i < ${slot_count} - 1) json += ",";
+              }
+              json += "]";
+              return json;
+
+sensor:
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    id: inverter${inverter_id}_f_dis
+    device_id: inverter_${inverter_id}
+    name: "Force Battery Discharge Limit"
+    address: 43129
+    internal: false
+    value_type: U_WORD
+    register_type: holding
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    on_raw_value:
+      then:
+        - lambda: "id(inverter${inverter_id}_shadow_f_dis) = x;"
+    filters:
+      multiply: 10
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    id: inverter${inverter_id}_r_chg
+    device_id: inverter_${inverter_id}
+    name: "Battery Charge Limit"
+    address: 43130
+    internal: false
+    value_type: U_WORD
+    register_type: holding
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    on_raw_value:
+      then:
+        - lambda: "id(inverter${inverter_id}_shadow_r_chg) = x;"
+    filters:
+      multiply: 10
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    id: inverter${inverter_id}_r_dis
+    device_id: inverter_${inverter_id}
+    name: "Battery Discharge Limit"
+    address: 43131
+    internal: false
+    value_type: U_WORD
+    register_type: holding
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    on_raw_value:
+      then:
+        - lambda: "id(inverter${inverter_id}_shadow_r_dis) = x;"
+    filters:
+      multiply: 10
+    entity_category: diagnostic
+    register_count: 4
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    id: inverter${inverter_id}_f_chg
+    device_id: inverter_${inverter_id}
+    name: "Force Battery Charge Limit"
+    address: 43136
+    internal: false
+    value_type: U_WORD
+    register_type: holding
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    on_raw_value:
+      then:
+        - lambda: "id(inverter${inverter_id}_shadow_f_chg) = x;"
+    filters:
+      multiply: 10
+    entity_category: diagnostic
+
+select:
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    internal: true
+    id: inverter${inverter_id}_battery_force_mode_select
+    address: 43135
+    value_type: U_WORD
+    optionsmap:
+      "Off": 0
+      "Force Charge": 1
+      "Force Discharge": 2
+    on_value:
+      then:
+        - lambda: |-
+            if (x == "Off") id(inverter${inverter_id}_shadow_mode) = 0;
+            else if (x == "Force Charge") id(inverter${inverter_id}_shadow_mode) = 1;
+            else if (x == "Force Discharge") id(inverter${inverter_id}_shadow_mode) = 2;
+
+text_sensor:
+  - platform: template
+    name: "Schedule Status"
+    id: inverter${inverter_id}_schedule_logic_status
+    device_id: inverter_${inverter_id}
+    entity_category: diagnostic
+
+# ==============================================================================
+# Schedule Control
+# ==============================================================================
+
+interval:
+  - interval: 10s
+    then:
+      - lambda: |-
+          // ==================================================================
+          // 1. CONSTANTS & LOCAL SCOPE (Package Variables)
+          // ==================================================================
+          const int MAX_SLOTS = ${slot_count};
+          const int MAX_POWER = ${inverter_max_power};
+          const int MIN_POWER_FLOOR = 110; // Safety floor for Solis RAM registers
+
+          auto time_now = id(my_time).now();
+          float current_soc = id(${battery_soc}).state;
+          float actual_p_raw = id(${battery_power}).state; 
+
+          enum SystemState { IDLE, CHARGING, CHARGE_HOLD, DISCHARGING, DISCHARGE_HOLD, ERROR };
+          SystemState current_state = IDLE;
+          int active_p = 0;
+          int active_soc = 0;
+          std::string status_txt = "Idle";
+
+          // ==================================================================
+          // 2. SCHEDULER: Define Active State
+          // ==================================================================
+          if (!time_now.is_valid()) {
+            current_state = ERROR;
+            status_txt = "System Error: Time Invalid";
+          } else {
+            int now_mins = (time_now.hour * 60) + time_now.minute;
+            for (int i = 0; i < MAX_SLOTS; i++) {
+              if (id(inverter${inverter_id}_s_active)[i]) {
+                int s = id(inverter${inverter_id}_s_start_mins)[i]; 
+                int e = id(inverter${inverter_id}_s_end_mins)[i];
+                bool in_win = (s > e) ? (now_mins >= s || now_mins < e) : (now_mins >= s && now_mins < e);
+                
+                if (in_win) {
+                  active_p = std::min((int)id(inverter${inverter_id}_s_power)[i], MAX_POWER); 
+                  active_soc = id(inverter${inverter_id}_s_target_soc)[i];
+                  id(inverter${inverter_id}_s_was_active)[i] = true;
+
+                  switch (id(inverter${inverter_id}_s_mode)[i]) {
+                    case 1: // CHARGE
+                      if (current_soc < active_soc || active_soc >= 100) {
+                        current_state = CHARGING;
+                        status_txt = "Charging to Target";
+                      } else if (abs(current_soc - (float)active_soc) < 0.5f) {
+                        current_state = CHARGE_HOLD;
+                        status_txt = "Charge Target Met (Holding)";
+                      } else {
+                        current_state = IDLE; 
+                        status_txt = "Charge Target Exceeded (Idle)";
+                      }
+                      break;
+
+                    case 2: // DISCHARGE
+                      if (current_soc > active_soc) {
+                        current_state = DISCHARGING;
+                        status_txt = "Discharging to Target";
+                      } else {
+                        current_state = IDLE;
+                        status_txt = "Discharge Target Met (Idle)";
+                      }
+                      break;
+
+                    default:
+                      current_state = IDLE;
+                      break;
+                  }
+                  break; 
+                } else if (id(inverter${inverter_id}_s_was_active)[i] && !id(inverter${inverter_id}_s_repeat)[i]) {
+                  id(inverter${inverter_id}_wipe_slot).execute(i); 
+                }
+              }
+            }
+          }
+
+          // ==================================================================
+          // 3. DYNAMIC STEP TRIMMING (With State Settling)
+          // ==================================================================
+          static int dynamic_trim = 0;
+          static int state_settling_ticks = 0; // Tracks how long in the current state
+          static SystemState last_state = IDLE;
+          int trimmed_p = 0;
+
+          // active_p == 0 means the user set no power limit (unlimited).
+          const bool unlimited_power = (active_p == 0);
+
+          // Reset settling timer and trim if the state changes (e.g., IDLE -> DISCHARGING)
+          if (current_state != last_state) {
+            dynamic_trim = 0;
+            state_settling_ticks = 0;
+            last_state = current_state;
+          }
+
+          if (current_state == CHARGING || current_state == DISCHARGING) {
+            if (unlimited_power) {
+              // No power target to track — skip trim entirely and use MAX_POWER.
+              // Also reset any accumulated trim so it does not bleed into a
+              // subsequent bounded slot within the same session.
+              dynamic_trim = 0;
+              state_settling_ticks = 0;
+              trimmed_p = MAX_POWER;
+            } else {
+              state_settling_ticks++; // Increment every 10s
+              
+              float current_actual = abs(actual_p_raw);
+              float error = (float)active_p - current_actual;
+              const float DEAD_BAND = 10.0f;
+
+              // Only adjust dynamic_trim after 3 ticks (30 seconds)
+              if (state_settling_ticks > 3) {
+                if (abs(error) > DEAD_BAND) {
+                  float raw_step = error * 0.20f; 
+                  int step_10w = (int)(roundf(raw_step / 10.0f) * 10.0f);
+
+                  if (step_10w == 0) step_10w = (error > 0) ? 10 : -10;
+                  dynamic_trim = clamp(dynamic_trim + step_10w, -1000, 1000);
+                }
+              } else {
+                // During the first 30s, dynamic_trim kept at 0 
+                // to let the inverter ramp to active_p naturally.
+                dynamic_trim = 0;
+              }
+
+              trimmed_p = ((active_p + dynamic_trim) / 10) * 10;
+              trimmed_p = clamp(trimmed_p, MIN_POWER_FLOOR, MAX_POWER);
+            }
+          } else {
+            dynamic_trim = 0;
+            trimmed_p = 0;
+            state_settling_ticks = 0;
+          }
+
+          // ==================================================================
+          // 4. MODBUS MAPPING (Register Preparation)
+          // ==================================================================
+          int t_m = 0, t_fc = MAX_POWER, t_fd = MAX_POWER, t_rc = 0, t_rd = 0;
+
+          switch (current_state) {
+            case CHARGING:       
+                t_m = 1; t_rc = trimmed_p; 
+                break;
+            case CHARGE_HOLD:    
+                t_m = 1; t_fc = 0; t_rc = 0; 
+                break;
+            case DISCHARGING:    
+                t_m = 2; t_rd = trimmed_p; 
+                break;
+            case DISCHARGE_HOLD:
+                t_m = 2; t_fd = 0; t_rd = 0;
+                break;
+            case ERROR:          
+                t_m = 0;
+                break;
+            default:
+                if (status_txt == "Idle") status_txt = "Outside Schedule Slot (Idle)";
+                break;
+          }
+          id(inverter${inverter_id}_schedule_logic_status).publish_state(status_txt);
+
+          // ==================================================================
+          // 5. SMART EXECUTION (Shadow Register Writes)
+          // ==================================================================
+          static int heartbeat_ticks = 0; 
+          heartbeat_ticks++;
+
+          auto update_reg = [&](int reg, int target, int &shadow) {
+            if (shadow != -1 && target != shadow) {
+              auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(inverter${inverter_id}_modbus_controller, reg, target);
+              inverter${inverter_id}_modbus_controller->queue_command(cmd);
+              shadow = target; 
+            }
+          };
+
+          if (id(inverter${inverter_id}_shadow_mode) != -1) {
+            if (t_m != id(inverter${inverter_id}_shadow_mode) || (heartbeat_ticks >= 6 && t_m != 0)) {
+              id(inverter${inverter_id}_battery_force_mode_select).make_call().set_index(t_m).perform();
+              id(inverter${inverter_id}_shadow_mode) = t_m;
+              heartbeat_ticks = 0; 
+            }
+          }
+          if (t_m == 0) heartbeat_ticks = 0;
+
+          update_reg(43136, t_fc / 10, id(inverter${inverter_id}_shadow_f_chg));
+          update_reg(43129, t_fd / 10, id(inverter${inverter_id}_shadow_f_dis));
+          update_reg(43130, t_rc / 10, id(inverter${inverter_id}_shadow_r_chg));
+          update_reg(43131, t_rd / 10, id(inverter${inverter_id}_shadow_r_dis));

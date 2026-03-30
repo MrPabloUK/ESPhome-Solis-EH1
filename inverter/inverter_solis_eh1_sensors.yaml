@@ -1,0 +1,759 @@
+# Updated : 2026.02.08
+# Version : 1.0.1
+# GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
+
+# Solis EH1 Controller
+
+# This YAML is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
+
+# +--------------------------------------+
+# | Component settings                   |
+# +--------------------------------------+
+
+esphome:
+  on_boot:
+    - priority: -100.0
+      then:
+        - binary_sensor.template.publish:
+            id: inverter${inverter_id}_online_status
+            state: OFF
+
+script:
+  - id: inverter${inverter_id}_reset_modbus_timer
+    mode: restart
+    then:
+      - binary_sensor.template.publish:
+          id: inverter${inverter_id}_online_status
+          state: ON
+      - delay: 30s # wait for 30 seconds
+      - binary_sensor.template.publish:
+          id: inverter${inverter_id}_online_status
+          state: OFF
+
+# +--------------------------------------+
+# | Component entities                   |
+# +--------------------------------------+
+
+binary_sensor:
+  # online_status
+  - platform: template
+    id: inverter${inverter_id}_online_status
+    device_id: inverter_${inverter_id}
+    name: Online Status
+    entity_category: diagnostic
+    trigger_on_initial_state: true
+    on_state:
+      then:
+        - lambda: |-
+            // Pass the current state to the update function
+            id(global_update_fault)(${CAT_INV_CTRL}, ${inverter_id}, !x);
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Operation Status - Normal
+    register_type: read
+    address: 33121
+    bitmask: 1
+    skip_updates: 5
+    entity_category: diagnostic
+    trigger_on_initial_state: true
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Operation Status - Initializing
+    register_type: read
+    address: 33121
+    bitmask: 2
+    skip_updates: 5
+    entity_category: diagnostic
+    trigger_on_initial_state: true
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Operation Status - Fault
+    device_class: problem
+    register_type: read
+    address: 33121
+    bitmask: 8
+    skip_updates: 5
+    entity_category: diagnostic
+    trigger_on_initial_state: true
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Operation Status - Standby
+    register_type: read
+    address: 33121
+    bitmask: 16
+    skip_updates: 5
+    entity_category: diagnostic
+    trigger_on_initial_state: true
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Operation Status - Derating
+    register_type: read
+    address: 33121
+    bitmask: 32
+    skip_updates: 5
+    entity_category: diagnostic
+    trigger_on_initial_state: true
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Operation status - External Limitation
+    register_type: read
+    address: 33121
+    bitmask: 64
+    skip_updates: 5
+    entity_category: diagnostic
+    trigger_on_initial_state: true
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Operation Status - Load Fault
+    device_class: problem
+    register_type: read
+    address: 33121
+    bitmask: 256
+    skip_updates: 5
+    entity_category: diagnostic
+    trigger_on_initial_state: true
+    filters:
+      - invert:
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Operation Status - Grid fault
+    device_class: problem
+    register_type: read
+    address: 33121
+    bitmask: 512
+    skip_updates: 5
+    entity_category: diagnostic
+    trigger_on_initial_state: true
+    filters:
+      - invert:
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Operation Status - Battery fault
+    device_class: problem
+    register_type: read
+    address: 33121
+    bitmask: 1024
+    skip_updates: 5
+    entity_category: diagnostic
+    trigger_on_initial_state: true
+    filters:
+      - invert:
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Battery Status
+    id: batt_chg
+    device_class: battery_charging
+    register_type: read
+    address: 33135
+    trigger_on_initial_state: true
+    filters:
+      - invert:
+
+sensor:
+  # PV Generation records
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Total Generation
+    device_class: energy
+    state_class: total_increasing
+    unit_of_measurement: kWh
+    register_type: read
+    address: 33029
+    value_type: U_DWORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Monthly Generation
+    device_class: energy
+    state_class: total_increasing
+    unit_of_measurement: kWh
+    register_type: read
+    address: 33031
+    value_type: U_DWORD
+    register_count: 4 # Extra registers so that one contiguous block of registers is queried
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Daily Generation
+    device_class: energy
+    state_class: total_increasing
+    unit_of_measurement: kWh
+    register_type: read
+    address: 33035
+    value_type: U_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+    register_count: 2 # Extra registers so that one contiguous block of registers is queried
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Yearly Generation
+    device_class: energy
+    state_class: total_increasing
+    unit_of_measurement: kWh
+    register_type: read
+    address: 33037
+    value_type: U_DWORD
+    accuracy_decimals: 0
+    register_count: 12 # Extra registers so that one contiguous block of registers is queried
+
+    # PV1 data
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: PV1 Voltage
+    device_class: voltage
+    state_class: measurement
+    unit_of_measurement: V
+    register_type: read
+    address: 33049
+    value_type: U_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+    id: inverter${inverter_id}_pv1_v
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: PV1 Current
+    device_class: current
+    state_class: measurement
+    unit_of_measurement: A
+    register_type: read
+    address: 33050
+    value_type: U_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+    id: inverter${inverter_id}_pv1_a
+
+  - platform: copy
+    source_id: inverter${inverter_id}_pv1_v
+    device_id: inverter_${inverter_id}
+    name: PV1 Power
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    filters:
+      - lambda: return x * id(inverter${inverter_id}_pv1_a).state;
+    accuracy_decimals: 0
+    id: inverter${inverter_id}_pv1_w
+
+  - platform: total_daily_energy
+    name: "PV1 Daily Energy"
+    device_id: inverter_${inverter_id}
+    power_id: inverter${inverter_id}_pv1_w
+    unit_of_measurement: "kWh"
+    method: left
+    state_class: total_increasing
+    device_class: energy
+    accuracy_decimals: 3
+    filters:
+      # Multiplication factor from W to kW is 0.001
+      - multiply: 0.001
+      - round: 3
+
+  # PV2 data
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: PV2 Voltage
+    device_class: voltage
+    state_class: measurement
+    unit_of_measurement: V
+    register_type: read
+    address: 33051
+    value_type: U_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+    id: inverter${inverter_id}_pv2_v
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: PV2 Current
+    device_class: current
+    state_class: measurement
+    unit_of_measurement: A
+    register_type: read
+    address: 33052
+    value_type: U_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+    id: inverter${inverter_id}_pv2_a
+    register_count: 5 # Extra registers so that one contiguous block of registers is queried
+
+  - platform: copy
+    source_id: inverter${inverter_id}_pv2_v
+    device_id: inverter_${inverter_id}
+    name: PV2 Power
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    filters:
+      - lambda: return x * id(inverter${inverter_id}_pv2_a).state;
+    accuracy_decimals: 0
+    id: inverter${inverter_id}_pv2_w
+
+  - platform: total_daily_energy
+    device_id: inverter_${inverter_id}
+    name: "PV2 Daily Energy"
+    power_id: inverter${inverter_id}_pv2_w
+    unit_of_measurement: "kWh"
+    method: left
+    state_class: total_increasing
+    device_class: energy
+    accuracy_decimals: 3
+    filters:
+      # Multiplication factor from W to kW is 0.001
+      - multiply: 0.001
+      - round: 3
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Total PV Power
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    register_type: read
+    address: 33057
+    value_type: U_DWORD
+    register_count: 16 # Extra registers so that one contiguous block of registers is queried
+
+  # # Inverter electrical data
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Inverter Voltage
+    device_class: voltage
+    state_class: measurement
+    unit_of_measurement: V
+    register_type: read
+    address: 33073
+    value_type: U_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+    register_count: 3 # Extra registers so that one contiguous block of registers is queried
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Inverter Current
+    device_class: current
+    state_class: measurement
+    unit_of_measurement: A
+    register_type: read
+    address: 33076
+    value_type: U_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+    register_count: 17 # Extra registers so that one contiguous block of registers is queried
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Inverter Temperature
+    device_class: temperature
+    state_class: measurement
+    unit_of_measurement: °C
+    register_type: read
+    address: 33093
+    value_type: S_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+      - exponential_moving_average:
+          alpha: 0.1
+          send_every: 1
+      - round: 1
+    id: inverter${inverter_id}_inverter_temp
+    on_value:
+      then:
+        - script.execute: inverter${inverter_id}_reset_modbus_timer
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Grid Frequency
+    device_class: frequency
+    state_class: measurement
+    unit_of_measurement: Hz
+    register_type: read
+    address: 33094
+    value_type: U_WORD
+    response_size: 2
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+
+  # # Battery Data
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Battery Voltage
+    device_class: voltage
+    state_class: measurement
+    unit_of_measurement: V
+    register_type: read
+    address: 33133
+    value_type: U_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Battery Current
+    device_class: current
+    state_class: measurement
+    unit_of_measurement: A
+    register_type: read
+    address: 33134
+    value_type: S_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+    #register_count: 2 # Extra registers so that one contiguous block of registers is queried
+
+    # Extra registers so that one contiguous block of registers is queried, unable to set custom register count on 33136 as not supported by sensor type
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: internal01
+    register_type: read
+    address: 33136
+    value_type: U_WORD
+    internal: True
+    register_count: 3
+    response_size: 6
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Battery SOC
+    device_class: battery
+    state_class: measurement
+    unit_of_measurement: "%"
+    register_type: read
+    address: 33139
+    value_type: U_WORD
+    id: inverter${inverter_id}_battery_soc
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Battery Health
+    device_class: battery
+    state_class: measurement
+    unit_of_measurement: "%"
+    register_type: read
+    address: 33140
+    value_type: U_WORD
+    register_count: 8 # Extra registers so that one contiguous block of registers is queried
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Backup Load Power
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    register_type: read
+    address: 33148
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Battery Power
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    register_type: read
+    address: 33149
+    value_type: S_DWORD
+    filters:
+      - lambda: |-
+          if(id(batt_chg).state) {
+            return x;
+          } else {
+            return x * -1.0;
+          }
+    id: inverter${inverter_id}_battery_power
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Inverter AC Power
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    register_type: read
+    address: 33151
+    value_type: S_DWORD
+    id: inverter${inverter_id}_inv_power
+    register_count: 10 # Extra registers so that one contiguous block of registers is queried
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Total Battery Charge
+    device_class: energy
+    state_class: total_increasing
+    unit_of_measurement: kWh
+    register_type: read
+    address: 33161
+    value_type: U_DWORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Daily Battery Charge
+    device_class: energy
+    state_class: total_increasing
+    unit_of_measurement: kWh
+    register_type: read
+    address: 33163
+    value_type: U_WORD
+    filters:
+      - multiply: 0.1
+    accuracy_decimals: 1
+    register_count: 2
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Total Battery Discharge
+    device_class: energy
+    state_class: total_increasing
+    unit_of_measurement: kWh
+    register_type: read
+    address: 33165
+    value_type: U_DWORD
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Daily Battery Discharge
+    device_class: energy
+    state_class: total_increasing
+    unit_of_measurement: kWh
+    register_type: read
+    address: 33167
+    value_type: U_WORD
+    filters:
+      - multiply: 0.1
+    accuracy_decimals: 1
+    register_count: 4 # Extra registers so that one contiguous block of registers is queried
+
+  # # Inverter Energy
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Daily Grid Import
+    device_class: energy
+    state_class: total_increasing
+    unit_of_measurement: kWh
+    register_type: read
+    address: 33171
+    value_type: U_WORD
+    filters:
+      - multiply: 0.1
+    accuracy_decimals: 1
+    register_count: 4 # Extra registers so that one contiguous block of registers is queried
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Daily Grid Export (New)
+    device_class: energy
+    state_class: total_increasing
+    unit_of_measurement: kWh
+    register_type: read
+    address: 33175
+    value_type: U_WORD
+    filters:
+      - multiply: 0.1
+    accuracy_decimals: 1
+
+  # # Meter Data
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Meter Voltage
+    device_class: voltage
+    state_class: measurement
+    unit_of_measurement: V
+    register_type: read
+    address: 33251
+    value_type: U_WORD
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Meter Current
+    device_class: current
+    state_class: measurement
+    unit_of_measurement: A
+    register_type: read
+    address: 33252
+    value_type: U_WORD
+    filters:
+      - multiply: 0.01
+    register_count: 11 # Extra registers so that one contiguous block of registers is queried
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Meter Active Power
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    register_type: read
+    address: 33263
+    value_type: S_DWORD
+    filters:
+      - multiply: -1 # Set import to positive value
+    id: inverter${inverter_id}_meter_power
+    register_count: 19 # Extra registers so that one contiguous block of registers is queried
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Meter Frequency
+    device_class: frequency
+    state_class: measurement
+    unit_of_measurement: Hz
+    register_type: read
+    address: 33282
+    value_type: U_WORD
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Meter Total Import
+    device_class: energy
+    state_class: total_increasing
+    unit_of_measurement: kWh
+    register_type: read
+    address: 33283
+    value_type: U_DWORD
+    filters:
+      - multiply: 0.01
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Meter Total Export
+    device_class: energy
+    state_class: total_increasing
+    unit_of_measurement: kWh
+    register_type: read
+    address: 33285
+    value_type: U_DWORD
+    filters:
+      - multiply: 0.01
+    register_count: 29 # Extra registers so that one contiguous block of registers is queried
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Secondary Meter Power
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    register_type: read
+    address: 33314
+    value_type: S_DWORD
+    id: inverter${inverter_id}_meter_2
+
+  - platform: total_daily_energy
+    name: "Secondary Meter Energy"
+    device_id: inverter_${inverter_id}
+    power_id: inverter${inverter_id}_meter_2
+    unit_of_measurement: "kWh"
+    state_class: total_increasing
+    device_class: energy
+    accuracy_decimals: 3
+    filters:
+      # Multiplication factor from W to kW is 0.001
+      - multiply: 0.001
+
+  - platform: copy
+    source_id: inverter${inverter_id}_inv_power
+    device_id: inverter_${inverter_id}
+    name: House Load Power
+    device_class: power
+    state_class: measurement
+    unit_of_measurement: W
+    filters:
+      - lambda: return x + id(inverter${inverter_id}_meter_power).state + id(inverter${inverter_id}_meter_2).state;
+      - lambda: |-
+          float MAX_VALUE = 26000.0;
+          if (x <= MAX_VALUE) return x;
+          else return {};
+      - clamp:
+          min_value: 0
+    accuracy_decimals: 0
+    id: inverter${inverter_id}_house_power
+
+  - platform: total_daily_energy
+    device_id: inverter_${inverter_id}
+    name: "Daily House Consumption"
+    power_id: inverter${inverter_id}_house_power
+    unit_of_measurement: "kWh"
+    method: left
+    state_class: total_increasing
+    device_class: energy
+    accuracy_decimals: 3
+    filters:
+      # Multiplication factor from W to kW is 0.001
+      - multiply: 0.001

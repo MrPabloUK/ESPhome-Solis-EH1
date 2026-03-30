@@ -1,0 +1,90 @@
+# Updated : 2026.01.22
+# Version : 1.0.0
+# GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
+
+# Solis EH1 Controller
+
+# This YAML is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
+
+switch:
+  - platform: template
+    name: Auto Time Synchronization
+    id: inverter${inverter_id}_rtc_switch
+    device_id: inverter_${inverter_id}
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    entity_category: config
+
+text_sensor:
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    id: inverter${inverter_id}_rtc
+    register_type: holding
+    address: 43000
+    register_count: 6
+    response_size: 12
+    raw_encode: HEXBYTES
+    entity_category: diagnostic
+    icon: mdi:clock-digital
+    skip_updates: 60
+    lambda: |-
+      // Parse inverter RTC registers into wall-clock values
+      int inv_year  = modbus_controller::word_from_hex_str(x, 0) + 2000;
+      int inv_month = modbus_controller::word_from_hex_str(x, 2);
+      int inv_day   = modbus_controller::word_from_hex_str(x, 4);
+      int inv_hour  = modbus_controller::word_from_hex_str(x, 6);
+      int inv_min   = modbus_controller::word_from_hex_str(x, 8);
+      int inv_sec   = modbus_controller::word_from_hex_str(x, 10);
+
+      ESP_LOGI("SyncInverterRTC", "Inverter RTC is %02d:%02d:%02d %04d-%02d-%02d",
+        inv_hour, inv_min, inv_sec, inv_year, inv_month, inv_day);
+
+      auto s_espt = id(my_time).now();
+      if (s_espt.is_valid()) {
+        // Compare time
+        int inv_total_s  = inv_hour * 3600 + inv_min * 60 + inv_sec;
+        int sntp_total_s = s_espt.hour * 3600 + s_espt.minute * 60 + s_espt.second;
+        int deviation    = inv_total_s - sntp_total_s;
+
+        // Check date separately — catches day rollovers and date drifts
+        bool date_wrong = (inv_year  != s_espt.year         ||
+                           inv_month != s_espt.month         ||
+                           inv_day   != s_espt.day_of_month);
+
+        ESP_LOGI("SyncInverterRTC", "SNTP local time %02d:%02d:%02d %04d-%02d-%02d, deviation=%ds",
+          s_espt.hour, s_espt.minute, s_espt.second,
+          s_espt.year, s_espt.month, s_espt.day_of_month, deviation);
+
+        if (abs(deviation) > 42 || date_wrong) {
+          std::vector<uint16_t> rtc_data = {
+            (uint16_t)(s_espt.year % 100),
+            (uint16_t) s_espt.month,
+            (uint16_t) s_espt.day_of_month,
+            (uint16_t) s_espt.hour,
+            (uint16_t) s_espt.minute,
+            (uint16_t) s_espt.second
+          };
+          auto set_rtc_command = modbus_controller::ModbusCommandItem::create_write_multiple_command(
+            inverter${inverter_id}_modbus_controller, item->start_address, item->register_count, rtc_data);
+          inverter${inverter_id}_modbus_controller->queue_command(set_rtc_command);
+          ESP_LOGI("SyncInverterRTC", "Inverter RTC updated to %02d:%02d:%02d %04d-%02d-%02d (deviation was %ds)",
+            s_espt.hour, s_espt.minute, s_espt.second,
+            s_espt.year, s_espt.month, s_espt.day_of_month, deviation);
+        } else {
+          ESP_LOGI("SyncInverterRTC", "Inverter RTC within tolerance (%ds), no update needed", deviation);
+        }
+      } else {
+        ESP_LOGI("SyncInverterRTC", "Inverter RTC not checked because SNTP is not yet synchronised");
+      }
+      return {};

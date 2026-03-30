@@ -1,0 +1,167 @@
+# Updated : 2026.01.22
+# Version : 1.0.0
+# GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
+
+# Solis EH1 Controller
+
+# This YAML is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
+
+number:
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Limit Output Power
+    disabled_by_default: false # intentionally disabled, remove if you know what you are doing
+    register_type: holding
+    address: 43052
+    value_type: U_WORD
+    unit_of_measurement: "%"
+    entity_category: config
+    icon: mdi:percent
+    mode: ${inverter_input_number_mode}
+    min_value: 0
+    max_value: 110
+    multiply: 100
+    skip_updates: 30
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Inverter Power Switch
+    id: inverter${inverter_id}_inv_power_sw
+    register_type: holding
+    address: 43007
+    value_type: U_WORD
+    entity_category: config
+    mode: ${inverter_input_number_mode}
+    internal: True
+    skip_updates: 30
+
+  - platform: modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    device_id: inverter_${inverter_id}
+    name: Storage Control Switches
+    register_type: holding
+    address: 43110
+    value_type: U_WORD
+    skip_updates: 10
+    id: inverter${inverter_id}_storage_control
+    internal: True
+
+switch:
+  - platform: template
+    name: Inverter Power Switch
+    device_id: inverter_${inverter_id}
+    lambda: |-
+      if(id(inverter${inverter_id}_inv_power_sw).state == 190) {
+        return true;
+      } else {
+        return false;
+      }
+    turn_on_action:
+      then:
+        if:
+          condition:
+            - binary_sensor.is_on: inverter${inverter_id}_online_status
+            # Only update the modbus switch if modbus is connected, otherwise incorrect values can be written to the inverter
+          then:
+            - number.set:
+                id: inverter${inverter_id}_inv_power_sw
+                value: 190 # 0xBE
+    turn_off_action:
+      then:
+        if:
+          condition:
+            - binary_sensor.is_on: inverter${inverter_id}_online_status
+            # Only update the modbus switch if modbus is connected, otherwise incorrect values can be written to the inverter
+          then:
+            - number.set:
+                id: inverter${inverter_id}_inv_power_sw
+                value: 222 # 0xDE
+
+  - platform: template
+    name: Grid Charge Allowed
+    id: sw_grid_charge
+    device_id: inverter_${inverter_id}
+    lambda: |-
+      int storage_bit = 5;
+      std::bitset<16> sw_val(id(inverter${inverter_id}_storage_control).state);
+      if (sw_val.test(storage_bit)) {
+        return true;
+      } else {
+        return false;
+      }
+    turn_on_action:
+      if:
+        condition:
+          - binary_sensor.is_on: inverter${inverter_id}_online_status
+          # Only update the modbus switch if modbus is connected, otherwise incorrect values can be written to the inverter
+        then:
+          - number.set:
+              id: inverter${inverter_id}_storage_control
+              value: !lambda |-
+                return (int)id(inverter${inverter_id}_storage_control).state | 32; // Bit 5
+    turn_off_action:
+      if:
+        condition:
+          - binary_sensor.is_on: inverter${inverter_id}_online_status
+          # Only update the modbus switch if modbus is connected, otherwise incorrect values can be written to the inverter
+        then:
+          - number.set:
+              id: inverter${inverter_id}_storage_control
+              value: !lambda |-
+                return (int)id(inverter${inverter_id}_storage_control).state & (~32); // Bit 5
+
+select:
+  - platform: template
+    id: inverter${inverter_id}_inv_mode
+    device_id: inverter_${inverter_id}
+    update_interval: 1s
+    name: "Inverter Mode"
+    options:
+      - "Self Use"
+      - "Feed In Priority"
+    lambda: |-
+      // Variables
+      uint16_t binary(id(inverter${inverter_id}_storage_control).state);
+
+      // Determine which bit is set
+      bool bit0 = binary & (1 << 0);  // Check Bit 0 (Self Use)
+      bool bit6 = binary & (1 << 6);  // Check Bit 6 (Feed In Priority)
+
+      if (bit0) {
+        return {"Self Use"};
+      } else if (bit6) {
+        return {"Feed In Priority"};
+      } else {
+        return {};
+      }
+    set_action:
+      if:
+        condition:
+          - binary_sensor.is_on: inverter${inverter_id}_online_status
+          # Only update the modbus switch if modbus is connected, otherwise incorrect values can be written to the inverter
+        then:
+          - number.set:
+              id: inverter${inverter_id}_storage_control
+              value: !lambda |-
+                int binary = (int)id(inverter${inverter_id}_storage_control).state;
+                if(x == "Self Use") {
+                  binary |= (1 << 0);  // Set Bit 0 - Self Use On
+                  binary &= ~(1 << 6); // Clear Bit 6 - Feed In Priority Off
+                } else if (x == "Feed In Priority") {
+                  binary |= (1 << 6);  // Set Bit 6 - Feed In Priority On
+                  binary &= ~(1 << 0); // Clear Bit 0 - Self Use Off                  
+                }           
+                return binary;

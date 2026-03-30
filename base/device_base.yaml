@@ -1,0 +1,127 @@
+# Updated : 2026.02.05
+# Version : 1.1.2
+# GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
+
+# Solis EH1 Controller
+
+# This YAML is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
+
+packages:
+  device_base_esphome: !include device_base_esphome.yaml
+  sub_device: !include device_base_sub_device.yaml
+  fault_registry: !include device_base_fault_registry.yaml
+
+substitutions:
+  # The ID of the LED on your board used for this component
+  board_status_led_id: "esp_light"
+  # ID for this component instance for fault registry
+  board_fault_device_id: "1"
+
+esphome:
+  on_boot:
+    - priority: 600.0
+      then:
+        - lambda: |-
+            // Register System
+            id(global_register_led)(${CAT_SYSTEM}, ${board_fault_device_id}, id(${board_status_led_id}));
+
+time:
+  # https://esphome.io/components/time/homeassistant
+  # https://esphome.io/components/time/sntp
+  - platform: sntp # homeassistant
+    id: my_time
+
+button:
+  # https://esphome.io/components/button/restart
+  - platform: restart
+    name: Restart
+    id: esp32_restart_button
+    device_id: ${board_id}
+    entity_category: config
+  # https://esphome.io/components/button/factory_reset
+  - platform: factory_reset
+    name: Factory reset
+    id: esp32_factory_reset_button
+    device_id: ${board_id}
+    entity_category: config
+
+binary_sensor:
+  # https://esphome.io/components/binary_sensor/status
+  - platform: status
+    name: Online status
+    id: esp32_online_status
+    device_id: ${board_id}
+    entity_category: diagnostic
+    trigger_on_initial_state: true
+    on_state:
+      then:
+        - lambda: |-
+            // Pass the current state to the update function
+            id(global_update_fault)(${CAT_SYSTEM}, ${board_fault_device_id}, !x);
+
+sensor:
+  # https://esphome.io/components/sensor/uptime
+  - platform: uptime
+    id: esp32_uptime_sec
+    device_id: ${board_id}
+    update_interval: 10s
+
+  # https://esphome.io/components/sensor/internal_temperature
+  - platform: internal_temperature
+    name: Internal temperature
+    id: esp32_internal_temperature
+    device_id: ${board_id}
+    update_interval: 10s
+    entity_category: diagnostic
+
+text_sensor:
+  # Uptime Human Readable
+  - platform: template
+    name: Uptime
+    id: esp32_uptime
+    device_id: ${board_id}
+    update_interval: 10s
+    icon: mdi:clock-start
+    entity_category: diagnostic
+    lambda: |-
+      int uptime_sec = id(esp32_uptime_sec).state;
+      int days = uptime_sec / 86400;
+      int hours = (uptime_sec % 86400) / 3600;
+      int minutes = (uptime_sec % 3600) / 60;
+      int seconds = uptime_sec % 60;
+      return {
+        (
+          (days ? std::to_string(days) +"d " : "") +
+          (hours ? std::to_string(hours) +"h " : "") +
+          (minutes ? std::to_string(minutes) +"m " : "") +
+          (std::to_string(seconds) +"s")
+        ).c_str()
+      };
+
+  # Now date and time
+  - platform: template
+    id: esp32_date_time_now
+    device_id: ${board_id}
+    update_interval: 10s
+    icon: mdi:clock-start
+    entity_category: diagnostic
+    lambda: return id(my_time).now().strftime("%Y-%m-%d %H:%M:%S");
+
+  # https://esphome.io/components/text_sensor/version
+  - platform: version
+    name: ESPHome version
+    id: esp32_esphome_version
+    device_id: ${board_id}
+    hide_timestamp: false #true
+    entity_category: diagnostic
