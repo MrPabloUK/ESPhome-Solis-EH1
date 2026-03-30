@@ -1,0 +1,152 @@
+# Updated : 2026.01.22
+# Version : 1.0.0
+# GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
+
+# Solis EH1 Controller
+
+# This YAML is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
+
+######################## Solis EH1 Controller Remote Packages Version ########################
+
+# You can compile this YAML directly without the `packages` folder.
+# The packages will be automatically downloaded from GitHub.
+# Don't forget to configure your WiFi credentials in the secrets.yaml
+
+################################################################################
+
+logger:
+  level: INFO # VERBOSE / DEBUG / INFO / WARN
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# Please use the native `api` component instead of the `mqtt` section.
+# If you use Home Assistant, the native API is more lightweight.
+# If there is no HA server connected to this API, the ESP32 reboots every 15 minutes to try to resolve the problem.
+# The "reboot_timeout: 0s" option will keep your ESP32 up and running even if you lose connection to your HA server.
+api:
+  reboot_timeout: 0s
+
+wifi:
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Solisinverter Fallback Hotspot"
+    password: "Solis123!"
+
+captive_portal:
+
+# +--------------------------------------+
+# | Global Settings                      |
+# +--------------------------------------+
+substitutions:
+  # Name
+  friendly_name : 'Solis Controller' # Prefix added in front of all entity names and also to classify them.
+  name: '' # Name that can be added as a second prefix after the friendly name, you can leave it blank.
+  hostname: 'solisinverter' # This is the name of the node. It should always be unique in your ESPHome network.
+  # +--------------------------------------+
+  # | Health & LED Assignment Logs         |
+  # +--------------------------------------+
+  enable_led_logging: 'false'     # Set to true to see if an led is assigned to a component correctly, logged every 60 seconds
+  enable_health_logging: 'false'  # Set to true to see if component health for all component instances, logged every 60 seconds
+
+
+# +--------------------------------------+
+# | Packages                             |
+# +--------------------------------------+
+
+packages:
+  remote_packages:
+    url: https://github.com/MrPabloUK/ESPhome-Solis-EH1
+    ref: main
+    refresh: 0s
+    files:
+
+  # +------------------------------------------------------------------------------+
+  # | >>> UNCOMMENT YOUR BOARD
+  # | >>> ONLY ONE BOARD !
+  # +------------------------------------------------------------------------------+
+
+      - path: 'packages/board/board_esp32_mrpablo_stick.yaml'
+
+  # +------------------------------------------------------------------------------+
+  # | >>> Board Options
+  # | >>> Uncomment your interfaces and options
+  # +------------------------------------------------------------------------------+
+
+  # UART 1 (uart_id: uart_esp_1)
+      - path: 'packages/board/board_options_itf_uart_esp_1.yaml'
+ 
+
+  # +------------------------------------------------------------------------------+
+  # | >>> Inverter
+  # +------------------------------------------------------------------------------+
+
+  # You can mix different inverter models, the only condition is that the `inverter_id` are numbered in order starting from 1 !
+
+  # >>> Copy your Inverter packages here
+
+      - path: 'packages/base/device_modbus.yaml'
+        vars:
+          modbus_id: 'solis_modbus'
+          modbus_role: 'client' # Client / Server
+          modbus_uart_id: 'uart_esp_1' # RS485 board
+          modbus_baud_rate: '9600' # 9600 / 19200 / 115200
+          modbus_send_wait_time: '150ms' # Time in milliseconds before the next ModBUS command is sent if an answer from a previous command is pending
+          turnaround_time: '125ms' # Time in milliseconds Between ModBUS commands
+    
+      - path: 'packages/inverter/inverter_solis_eh1_full.yaml'
+        vars:
+          inverter_name: 'Solis EH1'
+          inverter_id: '1'
+          inverter_modbus_id: 'solis_modbus'
+          inverter_modbus_address: '1'
+          inverter_update_interval: '1s'
+          inverter_input_number_mode: 'box' # box / slider
+          inverter_status_light_id: 'esp_light' # led used to show status. Default = esp_light, comment out or set to 'none' to disable
+
+          inverter_max_power: '6000' # Maximum rated power for the inverter
+        # slot_count: '12' # Count of schedule slots, defaulted to 12
+    
+  # +------------------------------------------------------------------------------+
+  # | >>> Add-On
+  # +------------------------------------------------------------------------------+
+
+      - path: 'packages/misc/misc_fan_controller.yaml'
+        vars:
+          equipment_type: 'inverter'
+          equipment_id: '1'
+          temperature_source: 'inverter_temp'
+
+  # +------------------------------------------------------------------------------+
+  # | >>> DEBUG
+  # +------------------------------------------------------------------------------+
+
+      - path: 'packages/misc/misc_fan_controller.yaml'
+        vars:
+          debug_name: 'Debug'
+          debug_update_interval: '5s'
+
+
+
+
+
+
+         
+
+
+
+
+
+    
