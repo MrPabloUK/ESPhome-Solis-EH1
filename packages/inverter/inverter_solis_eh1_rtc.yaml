@@ -1,5 +1,5 @@
-# Updated : 2026.01.22
-# Version : 1.0.0
+# Updated : 2026.04.07
+# Version : 1.0.1
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 
 # Solis EH1 Controller
@@ -50,41 +50,45 @@ text_sensor:
       ESP_LOGI("SyncInverterRTC", "Inverter RTC is %02d:%02d:%02d %04d-%02d-%02d",
         inv_hour, inv_min, inv_sec, inv_year, inv_month, inv_day);
 
-      auto s_espt = id(my_time).now();
-      if (s_espt.is_valid()) {
-        // Compare time
-        int inv_total_s  = inv_hour * 3600 + inv_min * 60 + inv_sec;
-        int sntp_total_s = s_espt.hour * 3600 + s_espt.minute * 60 + s_espt.second;
-        int deviation    = inv_total_s - sntp_total_s;
+      if (!id(inverter${inverter_id}_rtc_switch).state) {
+        ESP_LOGD("SyncInverterRTC", "Auto Time Synchronization is disabled, skipping RTC check");
+      } else {
+        auto s_espt = id(my_time).now();
+        if (s_espt.is_valid()) {
+          // Compare time
+          int inv_total_s  = inv_hour * 3600 + inv_min * 60 + inv_sec;
+          int sntp_total_s = s_espt.hour * 3600 + s_espt.minute * 60 + s_espt.second;
+          int deviation    = inv_total_s - sntp_total_s;
 
-        // Check date separately — catches day rollovers and date drifts
-        bool date_wrong = (inv_year  != s_espt.year         ||
-                           inv_month != s_espt.month         ||
-                           inv_day   != s_espt.day_of_month);
+          // Check date separately — catches day rollovers and date drifts
+          bool date_wrong = (inv_year  != s_espt.year         ||
+                             inv_month != s_espt.month         ||
+                             inv_day   != s_espt.day_of_month);
 
-        ESP_LOGI("SyncInverterRTC", "SNTP local time %02d:%02d:%02d %04d-%02d-%02d, deviation=%ds",
-          s_espt.hour, s_espt.minute, s_espt.second,
-          s_espt.year, s_espt.month, s_espt.day_of_month, deviation);
-
-        if (abs(deviation) > 42 || date_wrong) {
-          std::vector<uint16_t> rtc_data = {
-            (uint16_t)(s_espt.year % 100),
-            (uint16_t) s_espt.month,
-            (uint16_t) s_espt.day_of_month,
-            (uint16_t) s_espt.hour,
-            (uint16_t) s_espt.minute,
-            (uint16_t) s_espt.second
-          };
-          auto set_rtc_command = modbus_controller::ModbusCommandItem::create_write_multiple_command(
-            inverter${inverter_id}_modbus_controller, item->start_address, item->register_count, rtc_data);
-          inverter${inverter_id}_modbus_controller->queue_command(set_rtc_command);
-          ESP_LOGI("SyncInverterRTC", "Inverter RTC updated to %02d:%02d:%02d %04d-%02d-%02d (deviation was %ds)",
+          ESP_LOGI("SyncInverterRTC", "SNTP local time %02d:%02d:%02d %04d-%02d-%02d, deviation=%ds",
             s_espt.hour, s_espt.minute, s_espt.second,
             s_espt.year, s_espt.month, s_espt.day_of_month, deviation);
+
+          if (abs(deviation) > 42 || date_wrong) {
+            std::vector<uint16_t> rtc_data = {
+              (uint16_t)(s_espt.year % 100),
+              (uint16_t) s_espt.month,
+              (uint16_t) s_espt.day_of_month,
+              (uint16_t) s_espt.hour,
+              (uint16_t) s_espt.minute,
+              (uint16_t) s_espt.second
+            };
+            auto set_rtc_command = modbus_controller::ModbusCommandItem::create_write_multiple_command(
+              inverter${inverter_id}_modbus_controller, item->start_address, item->register_count, rtc_data);
+            inverter${inverter_id}_modbus_controller->queue_command(set_rtc_command);
+            ESP_LOGI("SyncInverterRTC", "Inverter RTC updated to %02d:%02d:%02d %04d-%02d-%02d (deviation was %ds)",
+              s_espt.hour, s_espt.minute, s_espt.second,
+              s_espt.year, s_espt.month, s_espt.day_of_month, deviation);
+          } else {
+            ESP_LOGI("SyncInverterRTC", "Inverter RTC within tolerance (%ds), no update needed", deviation);
+          }
         } else {
-          ESP_LOGI("SyncInverterRTC", "Inverter RTC within tolerance (%ds), no update needed", deviation);
+          ESP_LOGI("SyncInverterRTC", "Inverter RTC not checked because SNTP is not yet synchronised");
         }
-      } else {
-        ESP_LOGI("SyncInverterRTC", "Inverter RTC not checked because SNTP is not yet synchronised");
       }
       return {};
