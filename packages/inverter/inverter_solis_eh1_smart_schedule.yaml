@@ -1,6 +1,12 @@
-# Updated : 2026.01.22
-# Version : 1.0.0
+# Updated : 2026.03.30
+# Version : 1.1.0
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
+#
+# Changelog:
+#   1.1.0 - Added Auto Pause on Target SOC reached (per-slot option).
+#           When enabled, a slot auto-pauses after 30s of the SOC target
+#           being met. Repeating slots auto-reactivate at window end;
+#           non-repeating slots are deleted at window end.
 
 # Solis EH1 Controller
 
@@ -45,6 +51,7 @@ api:
         Power_Limit_Watts: int # 0-6000
         Target_SOC_Percent: int # 0-100
         Repeat_Daily: bool # true/false
+        Auto_Pause_On_Target: bool # true/false - pause slot when SOC target reached
       then:
         - if:
             condition:
@@ -72,7 +79,11 @@ api:
                   id(inverter${inverter_id}_s_power)[i] = Power_Limit_Watts;
                   id(inverter${inverter_id}_s_target_soc)[i] = Target_SOC_Percent;
                   id(inverter${inverter_id}_s_repeat)[i] = Repeat_Daily;
+                  id(inverter${inverter_id}_s_auto_pause)[i] = Auto_Pause_On_Target;
                   id(inverter${inverter_id}_s_was_active)[i] = false;
+                  // Any edit resurrects the slot and clears auto-pause runtime state
+                  id(inverter${inverter_id}_s_paused_by_target)[i] = false;
+                  id(inverter${inverter_id}_s_target_hit_ticks)[i] = 0;
               - script.execute: inverter${inverter_id}_push_schedules_to_ha
               - api.respond: { success: true }
 
@@ -83,9 +94,17 @@ api:
       then:
         - lambda: |-
             int i = Slot_Number - 1;
-            if (Instruction == 0) id(inverter${inverter_id}_wipe_slot).execute(i);
-            else if (Instruction == 1) id(inverter${inverter_id}_s_active)[i] = false;
-            else if (Instruction == 2) id(inverter${inverter_id}_s_active)[i] = true;
+            if (Instruction == 0) {
+              id(inverter${inverter_id}_wipe_slot).execute(i);
+            } else if (Instruction == 1) {
+              id(inverter${inverter_id}_s_active)[i] = false;
+              // Manual pause overrides any auto-pause runtime state
+              id(inverter${inverter_id}_s_paused_by_target)[i] = false;
+            } else if (Instruction == 2) {
+              id(inverter${inverter_id}_s_active)[i] = true;
+              id(inverter${inverter_id}_s_paused_by_target)[i] = false;
+              id(inverter${inverter_id}_s_target_hit_ticks)[i] = 0;
+            }
             id(inverter${inverter_id}_s_was_active)[i] = false;
         - script.execute: inverter${inverter_id}_push_schedules_to_ha
 
@@ -115,8 +134,17 @@ globals:
   - id: inverter${inverter_id}_s_repeat
     type: bool[${slot_count}]
     restore_value: yes
+  - id: inverter${inverter_id}_s_auto_pause
+    type: bool[${slot_count}]
+    restore_value: yes
+  - id: inverter${inverter_id}_s_paused_by_target
+    type: bool[${slot_count}]
+    restore_value: yes
   - id: inverter${inverter_id}_s_was_active
     type: bool[${slot_count}]
+    restore_value: no
+  - id: inverter${inverter_id}_s_target_hit_ticks
+    type: int[${slot_count}]
     restore_value: no
 
   # Shadow Registers: Initialized to -1 to prevent premature writes on boot
@@ -149,7 +177,10 @@ script:
           id(inverter${inverter_id}_s_power)[slot_id] = 0;
           id(inverter${inverter_id}_s_target_soc)[slot_id] = 0;
           id(inverter${inverter_id}_s_repeat)[slot_id] = false;
+          id(inverter${inverter_id}_s_auto_pause)[slot_id] = false;
+          id(inverter${inverter_id}_s_paused_by_target)[slot_id] = false;
           id(inverter${inverter_id}_s_was_active)[slot_id] = false;
+          id(inverter${inverter_id}_s_target_hit_ticks)[slot_id] = 0;
       - script.execute: inverter${inverter_id}_push_schedules_to_ha
 
   - id: inverter${inverter_id}_push_schedules_to_ha
@@ -158,7 +189,9 @@ script:
           event: esphome.solis_inverter${inverter_id}_schedule_update
           data_template:
             schedules: !lambda |-
-              std::string json = "[";
+              std::string json;
+              json.reserve(${slot_count} * 220);
+              json = "[";
               for (int i = 0; i < ${slot_count}; i++) {
                 std::string mode_str = "Idle";
                 if (id(inverter${inverter_id}_s_mode)[i] == 1) mode_str = "Charge";
@@ -169,15 +202,17 @@ script:
                 int e_h = id(inverter${inverter_id}_s_end_mins)[i] / 60;
                 int e_m = id(inverter${inverter_id}_s_end_mins)[i] % 60;
 
-                char buf[160];
-                snprintf(buf, sizeof(buf), 
-                  "{\"Slot\":%d,\"Active\":%s,\"Mode\":\"%s\",\"Start Time\":\"%02d:%02d\",\"End Time\":\"%02d:%02d\",\"Target SOC\":%d,\"Power\":%d,\"Repeat\":%s}",
+                char buf[220];
+                snprintf(buf, sizeof(buf),
+                  "{\"Slot\":%d,\"Active\":%s,\"Mode\":\"%s\",\"Start Time\":\"%02d:%02d\",\"End Time\":\"%02d:%02d\",\"Target SOC\":%d,\"Power\":%d,\"Repeat\":%s,\"Auto Pause\":%s,\"Paused By Target\":%s}",
                   i + 1, // Shift UI output to 1-12
-                  id(inverter${inverter_id}_s_active)[i] ? "true" : "false", 
-                  mode_str.c_str(), 
+                  id(inverter${inverter_id}_s_active)[i] ? "true" : "false",
+                  mode_str.c_str(),
                   s_h, s_m, e_h, e_m,
-                  id(inverter${inverter_id}_s_target_soc)[i], id(inverter${inverter_id}_s_power)[i], 
-                  id(inverter${inverter_id}_s_repeat)[i] ? "true" : "false"
+                  id(inverter${inverter_id}_s_target_soc)[i], id(inverter${inverter_id}_s_power)[i],
+                  id(inverter${inverter_id}_s_repeat)[i] ? "true" : "false",
+                  id(inverter${inverter_id}_s_auto_pause)[i] ? "true" : "false",
+                  id(inverter${inverter_id}_s_paused_by_target)[i] ? "true" : "false"
                 );
                 json += buf;
                 if (i < ${slot_count} - 1) json += ",";
@@ -321,6 +356,32 @@ interval:
             status_txt = "System Error: Time Invalid";
           } else {
             int now_mins = (time_now.hour * 60) + time_now.minute;
+
+            // Second-pass cleanup for slots auto-paused by target SOC:
+            // - Repeating slots re-activate once their window has ended
+            //   (ready to run again at the next occurrence).
+            // - Non-repeating slots are deleted once their window has ended.
+            for (int i = 0; i < MAX_SLOTS; i++) {
+              if (id(inverter${inverter_id}_s_paused_by_target)[i]) {
+                int ps = id(inverter${inverter_id}_s_start_mins)[i];
+                int pe = id(inverter${inverter_id}_s_end_mins)[i];
+                bool p_in_win = (ps > pe)
+                  ? (now_mins >= ps || now_mins < pe)
+                  : (now_mins >= ps && now_mins < pe);
+                if (!p_in_win) {
+                  if (id(inverter${inverter_id}_s_repeat)[i]) {
+                    id(inverter${inverter_id}_s_active)[i] = true;
+                    id(inverter${inverter_id}_s_paused_by_target)[i] = false;
+                    id(inverter${inverter_id}_s_was_active)[i] = false;
+                    id(inverter${inverter_id}_s_target_hit_ticks)[i] = 0;
+                    id(inverter${inverter_id}_push_schedules_to_ha).execute();
+                  } else {
+                    id(inverter${inverter_id}_wipe_slot).execute(i);
+                  }
+                }
+              }
+            }
+
             for (int i = 0; i < MAX_SLOTS; i++) {
               if (id(inverter${inverter_id}_s_active)[i]) {
                 int s = id(inverter${inverter_id}_s_start_mins)[i]; 
@@ -332,17 +393,22 @@ interval:
                   active_soc = id(inverter${inverter_id}_s_target_soc)[i];
                   id(inverter${inverter_id}_s_was_active)[i] = true;
 
+                  bool target_hit = false;
                   switch (id(inverter${inverter_id}_s_mode)[i]) {
                     case 1: // CHARGE
                       if (current_soc < active_soc || active_soc >= 100) {
                         current_state = CHARGING;
                         status_txt = "Charging to Target";
-                      } else if (abs(current_soc - (float)active_soc) < 0.5f) {
-                        current_state = CHARGE_HOLD;
-                        status_txt = "Charge Target Met (Holding)";
+                        id(inverter${inverter_id}_s_target_hit_ticks)[i] = 0;
                       } else {
-                        current_state = IDLE; 
-                        status_txt = "Charge Target Exceeded (Idle)";
+                        target_hit = true;
+                        if (abs(current_soc - (float)active_soc) < 0.5f) {
+                          current_state = CHARGE_HOLD;
+                          status_txt = "Charge Target Met (Holding)";
+                        } else {
+                          current_state = IDLE;
+                          status_txt = "Charge Target Exceeded (Idle)";
+                        }
                       }
                       break;
 
@@ -350,7 +416,9 @@ interval:
                       if (current_soc > active_soc) {
                         current_state = DISCHARGING;
                         status_txt = "Discharging to Target";
+                        id(inverter${inverter_id}_s_target_hit_ticks)[i] = 0;
                       } else {
+                        target_hit = true;
                         current_state = IDLE;
                         status_txt = "Discharge Target Met (Idle)";
                       }
@@ -360,7 +428,23 @@ interval:
                       current_state = IDLE;
                       break;
                   }
-                  break; 
+
+                  // Auto-Pause: after 3 confirmed ticks (30s) of target-hit,
+                  // pause the slot. Repeating slots auto-reactivate when the
+                  // window ends; non-repeating slots are wiped at window end.
+                  if (target_hit && id(inverter${inverter_id}_s_auto_pause)[i]) {
+                    id(inverter${inverter_id}_s_target_hit_ticks)[i]++;
+                    if (id(inverter${inverter_id}_s_target_hit_ticks)[i] >= 3) {
+                      id(inverter${inverter_id}_s_active)[i] = false;
+                      id(inverter${inverter_id}_s_paused_by_target)[i] = true;
+                      id(inverter${inverter_id}_s_was_active)[i] = false;
+                      id(inverter${inverter_id}_s_target_hit_ticks)[i] = 0;
+                      current_state = IDLE;
+                      status_txt = "Slot Paused: Target Reached";
+                      id(inverter${inverter_id}_push_schedules_to_ha).execute();
+                    }
+                  }
+                  break;
                 } else if (id(inverter${inverter_id}_s_was_active)[i] && !id(inverter${inverter_id}_s_repeat)[i]) {
                   id(inverter${inverter_id}_wipe_slot).execute(i); 
                 }
