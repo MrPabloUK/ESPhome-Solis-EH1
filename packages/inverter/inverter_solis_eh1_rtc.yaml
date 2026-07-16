@@ -40,12 +40,12 @@ text_sensor:
     skip_updates: 60
     lambda: |-
       // Parse inverter RTC registers into wall-clock values
-      int inv_year  = modbus_controller::word_from_hex_str(x, 0) + 2000;
-      int inv_month = modbus_controller::word_from_hex_str(x, 2);
-      int inv_day   = modbus_controller::word_from_hex_str(x, 4);
-      int inv_hour  = modbus_controller::word_from_hex_str(x, 6);
-      int inv_min   = modbus_controller::word_from_hex_str(x, 8);
-      int inv_sec   = modbus_controller::word_from_hex_str(x, 10);
+      int inv_year  = modbus::helpers::word_from_hex_str(x, 0) + 2000;
+      int inv_month = modbus::helpers::word_from_hex_str(x, 2);
+      int inv_day   = modbus::helpers::word_from_hex_str(x, 4);
+      int inv_hour  = modbus::helpers::word_from_hex_str(x, 6);
+      int inv_min   = modbus::helpers::word_from_hex_str(x, 8);
+      int inv_sec   = modbus::helpers::word_from_hex_str(x, 10);
 
       ESP_LOGI("SyncInverterRTC", "Inverter RTC is %02d:%02d:%02d %04d-%02d-%02d",
         inv_hour, inv_min, inv_sec, inv_year, inv_month, inv_day);
