@@ -1,9 +1,13 @@
+# Updated : 2026.03.30
+# Version : 1.1.0
+
 blueprint:
   name: "Solis: Create/Edit Schedule"
   description: >
     Create or update a Solis inverter schedule slot via ESPHome.
     Configure the ESPHome action prefix to match your device
     (e.g. `solisinverter_inverter1` for the default hostname).
+    Includes Auto-Pause on Target SOC option.
   domain: script
   source_url: https://raw.githubusercontent.com/MrPabloUK/ESPhome-Solis-EH1/main/home_assistant/blueprints/solis_schedule_manager.yaml
   input:
@@ -81,6 +85,16 @@ fields:
     default: false
     selector:
       boolean: {}
+  auto_pause:
+    name: Auto Pause on Target
+    description: >-
+      Pause the slot once the SOC target is reached (confirmed for 30s).
+      Repeating slots auto-resume at the end of the time window; non-repeating
+      slots are deleted at the end of the time window.
+    required: true
+    default: false
+    selector:
+      boolean: {}
 
 sequence:
 - action: "esphome.{{ _device_prefix }}_upsert_schedule"
@@ -94,5 +108,6 @@ sequence:
     Target_SOC_Percent: '{{ target_soc | int }}'
     Power_Limit_Watts: '{{ limit_watts | int }}'
     Repeat_Daily: '{{ repeat_day }}'
+    Auto_Pause_On_Target: '{{ auto_pause }}'
 
 mode: single

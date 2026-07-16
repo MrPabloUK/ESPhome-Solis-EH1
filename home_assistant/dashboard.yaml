@@ -1,11 +1,15 @@
+# Solis Schedule Dashboard Card (Home Assistant)
+# Updated : 2026.03.30
+# Version : 1.1.0
+
 type: vertical-stack
 cards:
   - type: markdown
     title: Inverter Schedules
     content: >-
-      | Slot | Status | Mode | Time Window | SOC | Power | Repeat |
+      | Slot | Status | Mode | Time Window | SOC | Power | Repeat | Auto Pause |
 
-      |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+      |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 
       {%- set data = state_attr('sensor.solis_master_schedule', 'data') %}
 
@@ -13,23 +17,33 @@ cards:
         {%- for s in data %}
           {%- if s.Mode == 'Idle' or s.Mode == '' %}
             {%- set status = '-' %}
-            {%- set mode, times, soc, pwr, rep = '-', '-', '-', '-', '-' %}
+            {%- set mode, times, soc, pwr, rep, ap = '-', '-', '-', '-', '-', '-' %}
           {%- else %}
-            {%- set status = '✅' if s.Active else '⏸' %}
+            {%- if s['Paused By Target'] %}
+              {%- set status = '💤' %}
+            {%- elif s.Active %}
+              {%- set status = '✅' %}
+            {%- else %}
+              {%- set status = '⏸' %}
+            {%- endif %}
             {%- set mode = s.Mode %}
             {%- set times = s['Start Time'] ~ " - " ~ s['End Time'] %}
             {%- set soc = s['Target SOC'] ~ "%" %}
             {%- set pwr = (s.Power ~ "W") if (s.Power | int) > 0 else "∞" %}
             {%- set rep = '✅' if s.Repeat else '❌' %}
+            {%- set ap = '✅' if s['Auto Pause'] else '❌' %}
           {%- endif %}
       | {{ s.Slot }} | {{ status }} | {{ mode }} | {{ times }} | {{ soc }} | {{
-      pwr }} | {{ rep }} |
+      pwr }} | {{ rep }} | {{ ap }} |
         {%- endfor %}
       {%- else %}
 
-      | | | No data received yet | | | | |
+      | | | No data received yet | | | | | |
 
       {%- endif %}
+
+
+      Status legend: ✅ Active · ⏸ Paused · 💤 Auto-Paused (target reached)
   - type: entities
     show_header_toggle: false
     entities:

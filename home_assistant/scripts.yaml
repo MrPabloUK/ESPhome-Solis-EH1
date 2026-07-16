@@ -1,3 +1,7 @@
+# Solis Schedule Scripts (Home Assistant)
+# Updated : 2026.03.30
+# Version : 1.1.0
+
 solis_schedule_manager:
   alias: 'Solis: Create/Edit Schedule'
   icon: mdi:calendar-edit
@@ -61,6 +65,16 @@ solis_schedule_manager:
       default: false
       selector:
         boolean: {}
+    auto_pause:
+      name: Auto Pause on Target
+      description: >-
+        Pause the slot once the SOC target is reached (confirmed for 30s).
+        Repeating slots auto-resume at the end of the time window; non-repeating
+        slots are deleted at the end of the time window.
+      required: true
+      default: false
+      selector:
+        boolean: {}
   sequence:
   - action: esphome.solisinverter_inverter1_upsert_schedule
     data:
@@ -73,6 +87,7 @@ solis_schedule_manager:
       Target_SOC_Percent: '{{ target_soc | int }}'
       Power_Limit_Watts: '{{ limit_watts | int }}'
       Repeat_Daily: '{{ repeat_day }}'
+      Auto_Pause_On_Target: '{{ auto_pause }}'
   mode: single
 solis_schedule_slot_control:
   alias: 'Solis: Schedule Slot Control'
