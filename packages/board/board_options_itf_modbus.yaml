@@ -24,7 +24,7 @@ substitutions:
   modbus_baud_rate: '9600' # 9600 / 19200 / 115200
   # Modbus
   modbus_send_wait_time: '150ms' # Timeout: max time to wait for the FIRST byte of a response
-  modbus_turnaround_time: '125ms' # Pause after a completed response before the next command
+  modbus_turnaround_time: '50ms' # Pause after a completed response before the next command
 
 uart:
   - id: !extend ${modbus_uart_id}

@@ -94,7 +94,7 @@ packages:
       modbus_uart_id: 'uart_esp_1' # RS485 board
       modbus_baud_rate: '9600' # 9600 / 19200 / 115200
       modbus_send_wait_time: '150ms' # Timeout: max time to wait for the FIRST byte of a response
-      modbus_turnaround_time: '125ms' # Pause after a completed response before the next command
+      modbus_turnaround_time: '50ms' # Pause after a completed response before the next command
 
   # +------------------------------------------------------------------------------+
   # | >>> Inverter

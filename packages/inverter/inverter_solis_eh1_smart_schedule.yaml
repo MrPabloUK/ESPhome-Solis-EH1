@@ -1,8 +1,10 @@
 # Updated : 2026.08.16
-# Version : 1.2.0
+# Version : 1.2.1
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 #
 # Changelog:
+#   1.2.1 - Skip holding-register polls most cycles so 1s input-register
+#           reads are not queued twice (ESPHome duplicate command warnings).
 #   1.2.0 - Date-aware slots: daily, selected days, once, and date range.
 #           Overnight windows use the start-day as the date/day-of-week anchor.
 #           Logic is covered by tests/test_date_aware_schedule.py.
@@ -329,6 +331,7 @@ sensor:
     filters:
       multiply: 10
     entity_category: diagnostic
+    skip_updates: 10
 
   - platform: modbus_controller
     modbus_controller_id: inverter${inverter_id}_modbus_controller
@@ -348,6 +351,7 @@ sensor:
     filters:
       multiply: 10
     entity_category: diagnostic
+    skip_updates: 10
 
   - platform: modbus_controller
     modbus_controller_id: inverter${inverter_id}_modbus_controller
@@ -368,6 +372,7 @@ sensor:
       multiply: 10
     entity_category: diagnostic
     register_count: 4
+    skip_updates: 10
 
   - platform: modbus_controller
     modbus_controller_id: inverter${inverter_id}_modbus_controller
@@ -387,6 +392,7 @@ sensor:
     filters:
       multiply: 10
     entity_category: diagnostic
+    skip_updates: 10
 
 select:
   - platform: modbus_controller
@@ -399,6 +405,7 @@ select:
       "Off": 0
       "Force Charge": 1
       "Force Discharge": 2
+    skip_updates: 10
     on_value:
       then:
         - lambda: |-
