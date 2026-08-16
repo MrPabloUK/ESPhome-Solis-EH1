@@ -1,8 +1,12 @@
-# Updated : 2026.03.30
-# Version : 1.1.0
+# Updated : 2026.08.16
+# Version : 1.2.0
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 #
 # Changelog:
+#   1.2.0 - Date-aware slots: daily, selected days, once, and date range.
+#           Overnight windows use the start-day as the date/day-of-week anchor.
+#           Logic is covered by tests/test_date_aware_schedule.py.
+#           Added delete-all-schedules API action.
 #   1.1.0 - Added Auto Pause on Target SOC reached (per-slot option).
 #           When enabled, a slot auto-pauses after 30s of the SOC target
 #           being met. Repeating slots auto-reactivate at window end;
@@ -50,38 +54,77 @@ api:
         Operation_Mode: int # 1=Charge, 2=Discharge
         Power_Limit_Watts: int # 0-6000
         Target_SOC_Percent: int # 0-100
-        Repeat_Daily: bool # true/false
+        Repeat_Daily: bool # legacy fallback when Repeat_Mode/date fields are all zero
         Auto_Pause_On_Target: bool # true/false - pause slot when SOC target reached
+        Repeat_Mode: int # 0=Daily, 1=Selected days, 2=Once, 3=Date range
+        Selected_Days: int # bit0=Mon .. bit6=Sun (mode 1)
+        Date_Start: int # YYYYMMDD or 0
+        Date_End: int # YYYYMMDD or 0 (mode 3)
       then:
         - if:
             condition:
               lambda: |-
-                // Validation using human-readable names
+                auto days_in_month = [](int month, int year) -> int {
+                  static const int dim[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+                  if (month == 2 && ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0)) return 29;
+                  return dim[month];
+                };
+                auto valid_ymd = [&](int ymd) -> bool {
+                  if (ymd <= 0) return false;
+                  int y = ymd / 10000, m = (ymd / 100) % 100, d = ymd % 100;
+                  if (y < 2020 || y > 2100 || m < 1 || m > 12 || d < 1) return false;
+                  return d <= days_in_month(m, y);
+                };
                 if (Slot_Number < 1 || Slot_Number > ${slot_count}) return true;
                 if (Start_Hour < 0 || Start_Hour > 23 || Start_Minute < 0 || Start_Minute > 59) return true;
                 if (End_Hour < 0 || End_Hour > 23 || End_Minute < 0 || End_Minute > 59) return true;
                 if (Target_SOC_Percent < 0 || Target_SOC_Percent > 100) return true;
                 if (Operation_Mode < 1 || Operation_Mode > 2) return true;
                 if (Power_Limit_Watts < 0 || Power_Limit_Watts > ${inverter_max_power}) return true;
+                bool using_legacy = (Repeat_Mode == 0 && Selected_Days == 0 && Date_Start == 0 && Date_End == 0);
+                if (!using_legacy) {
+                  if (Repeat_Mode < 0 || Repeat_Mode > 3) return true;
+                  if (Repeat_Mode == 1 && (Selected_Days < 1 || Selected_Days > 127)) return true;
+                  if (Repeat_Mode == 2 && !valid_ymd(Date_Start)) return true;
+                  if (Repeat_Mode == 3 && (!valid_ymd(Date_Start) || !valid_ymd(Date_End) || Date_Start > Date_End)) return true;
+                }
                 return false;
             then:
               - api.respond:
                   success: false
-                  error_message: "Validation failed. Ensure Slot number within range, Time is 24h format, and SOC is 0-100."
+                  error_message: "Validation failed. Check slot, 24h times, SOC, power, and date/day fields."
             else:
               - lambda: |-
-                  // Mapping UI (1-12) to Array (0-11)
-                  int i = Slot_Number - 1; 
+                  int i = Slot_Number - 1;
+                  uint8_t rmode = (uint8_t) Repeat_Mode;
+                  int selected_days = Selected_Days;
+                  int date_start = Date_Start;
+                  int date_end = Date_End;
+                  bool using_legacy = (Repeat_Mode == 0 && Selected_Days == 0 && Date_Start == 0 && Date_End == 0);
+                  if (using_legacy) {
+                    if (Repeat_Daily) {
+                      rmode = 0; selected_days = 0; date_start = 0; date_end = 0;
+                    } else {
+                      auto now = id(my_time).now();
+                      rmode = 2; selected_days = 0; date_end = 0;
+                      date_start = now.is_valid()
+                        ? (now.year * 10000 + now.month * 100 + now.day_of_month)
+                        : 0;
+                    }
+                  }
                   id(inverter${inverter_id}_s_active)[i] = true;
                   id(inverter${inverter_id}_s_start_mins)[i] = (Start_Hour * 60) + Start_Minute;
                   id(inverter${inverter_id}_s_end_mins)[i] = (End_Hour * 60) + End_Minute;
                   id(inverter${inverter_id}_s_mode)[i] = (uint8_t)Operation_Mode;
                   id(inverter${inverter_id}_s_power)[i] = Power_Limit_Watts;
                   id(inverter${inverter_id}_s_target_soc)[i] = Target_SOC_Percent;
-                  id(inverter${inverter_id}_s_repeat)[i] = Repeat_Daily;
+                  id(inverter${inverter_id}_s_repeat_mode)[i] = rmode;
+                  id(inverter${inverter_id}_s_selected_days)[i] = (uint8_t) selected_days;
+                  id(inverter${inverter_id}_s_date_start)[i] = date_start;
+                  id(inverter${inverter_id}_s_date_end)[i] = date_end;
+                  id(inverter${inverter_id}_s_repeat)[i] = (rmode != 2);
                   id(inverter${inverter_id}_s_auto_pause)[i] = Auto_Pause_On_Target;
                   id(inverter${inverter_id}_s_was_active)[i] = false;
-                  // Any edit resurrects the slot and clears auto-pause runtime state
                   id(inverter${inverter_id}_s_paused_by_target)[i] = false;
                   id(inverter${inverter_id}_s_target_hit_ticks)[i] = 0;
               - script.execute: inverter${inverter_id}_push_schedules_to_ha
@@ -108,6 +151,11 @@ api:
             id(inverter${inverter_id}_s_was_active)[i] = false;
         - script.execute: inverter${inverter_id}_push_schedules_to_ha
 
+    - action: inverter${inverter_id}_delete_all_schedules
+      then:
+        - script.execute: inverter${inverter_id}_wipe_all_slots
+        - api.respond: { success: true }
+
 # ==============================================================================
 # GLOBAL STORAGE & SHADOW REGISTERS
 # ==============================================================================
@@ -133,6 +181,18 @@ globals:
     restore_value: yes
   - id: inverter${inverter_id}_s_repeat
     type: bool[${slot_count}]
+    restore_value: yes
+  - id: inverter${inverter_id}_s_repeat_mode
+    type: uint8_t[${slot_count}]
+    restore_value: yes
+  - id: inverter${inverter_id}_s_selected_days
+    type: uint8_t[${slot_count}]
+    restore_value: yes
+  - id: inverter${inverter_id}_s_date_start
+    type: int[${slot_count}]
+    restore_value: yes
+  - id: inverter${inverter_id}_s_date_end
+    type: int[${slot_count}]
     restore_value: yes
   - id: inverter${inverter_id}_s_auto_pause
     type: bool[${slot_count}]
@@ -177,10 +237,36 @@ script:
           id(inverter${inverter_id}_s_power)[slot_id] = 0;
           id(inverter${inverter_id}_s_target_soc)[slot_id] = 0;
           id(inverter${inverter_id}_s_repeat)[slot_id] = false;
+          id(inverter${inverter_id}_s_repeat_mode)[slot_id] = 0;
+          id(inverter${inverter_id}_s_selected_days)[slot_id] = 0;
+          id(inverter${inverter_id}_s_date_start)[slot_id] = 0;
+          id(inverter${inverter_id}_s_date_end)[slot_id] = 0;
           id(inverter${inverter_id}_s_auto_pause)[slot_id] = false;
           id(inverter${inverter_id}_s_paused_by_target)[slot_id] = false;
           id(inverter${inverter_id}_s_was_active)[slot_id] = false;
           id(inverter${inverter_id}_s_target_hit_ticks)[slot_id] = 0;
+      - script.execute: inverter${inverter_id}_push_schedules_to_ha
+
+  - id: inverter${inverter_id}_wipe_all_slots
+    then:
+      - lambda: |-
+          for (int i = 0; i < ${slot_count}; i++) {
+            id(inverter${inverter_id}_s_active)[i] = false;
+            id(inverter${inverter_id}_s_start_mins)[i] = 0;
+            id(inverter${inverter_id}_s_end_mins)[i] = 0;
+            id(inverter${inverter_id}_s_mode)[i] = 0;
+            id(inverter${inverter_id}_s_power)[i] = 0;
+            id(inverter${inverter_id}_s_target_soc)[i] = 0;
+            id(inverter${inverter_id}_s_repeat)[i] = false;
+            id(inverter${inverter_id}_s_repeat_mode)[i] = 0;
+            id(inverter${inverter_id}_s_selected_days)[i] = 0;
+            id(inverter${inverter_id}_s_date_start)[i] = 0;
+            id(inverter${inverter_id}_s_date_end)[i] = 0;
+            id(inverter${inverter_id}_s_auto_pause)[i] = false;
+            id(inverter${inverter_id}_s_paused_by_target)[i] = false;
+            id(inverter${inverter_id}_s_was_active)[i] = false;
+            id(inverter${inverter_id}_s_target_hit_ticks)[i] = 0;
+          }
       - script.execute: inverter${inverter_id}_push_schedules_to_ha
 
   - id: inverter${inverter_id}_push_schedules_to_ha
@@ -190,7 +276,7 @@ script:
           data_template:
             schedules: !lambda |-
               std::string json;
-              json.reserve(${slot_count} * 220);
+              json.reserve(${slot_count} * 320);
               json = "[";
               for (int i = 0; i < ${slot_count}; i++) {
                 std::string mode_str = "Idle";
@@ -202,15 +288,19 @@ script:
                 int e_h = id(inverter${inverter_id}_s_end_mins)[i] / 60;
                 int e_m = id(inverter${inverter_id}_s_end_mins)[i] % 60;
 
-                char buf[220];
+                char buf[320];
                 snprintf(buf, sizeof(buf),
-                  "{\"Slot\":%d,\"Active\":%s,\"Mode\":\"%s\",\"Start Time\":\"%02d:%02d\",\"End Time\":\"%02d:%02d\",\"Target SOC\":%d,\"Power\":%d,\"Repeat\":%s,\"Auto Pause\":%s,\"Paused By Target\":%s}",
+                  "{\"Slot\":%d,\"Active\":%s,\"Mode\":\"%s\",\"Start Time\":\"%02d:%02d\",\"End Time\":\"%02d:%02d\",\"Target SOC\":%d,\"Power\":%d,\"Repeat\":%s,\"Repeat Mode\":%d,\"Selected Days\":%d,\"Date Start\":%d,\"Date End\":%d,\"Auto Pause\":%s,\"Paused By Target\":%s}",
                   i + 1, // Shift UI output to 1-12
                   id(inverter${inverter_id}_s_active)[i] ? "true" : "false",
                   mode_str.c_str(),
                   s_h, s_m, e_h, e_m,
                   id(inverter${inverter_id}_s_target_soc)[i], id(inverter${inverter_id}_s_power)[i],
                   id(inverter${inverter_id}_s_repeat)[i] ? "true" : "false",
+                  (int) id(inverter${inverter_id}_s_repeat_mode)[i],
+                  (int) id(inverter${inverter_id}_s_selected_days)[i],
+                  id(inverter${inverter_id}_s_date_start)[i],
+                  id(inverter${inverter_id}_s_date_end)[i],
                   id(inverter${inverter_id}_s_auto_pause)[i] ? "true" : "false",
                   id(inverter${inverter_id}_s_paused_by_target)[i] ? "true" : "false"
                 );
@@ -356,20 +446,79 @@ interval:
             status_txt = "System Error: Time Invalid";
           } else {
             int now_mins = (time_now.hour * 60) + time_now.minute;
+            int today_ymd = time_now.year * 10000 + time_now.month * 100 + time_now.day_of_month;
+            int dow = time_now.day_of_week; // Sunday=1 .. Saturday=7
+            auto days_in_month = [](int month, int year) -> int {
+              static const int dim[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+              if (month == 2 && ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0)) return 29;
+              return dim[month];
+            };
+            int yy = time_now.year, ym = time_now.month, yd = time_now.day_of_month;
+            int ydow = (dow == 1) ? 7 : dow - 1;
+            if (yd > 1) {
+              yd -= 1;
+            } else if (ym > 1) {
+              ym -= 1;
+              yd = days_in_month(ym, yy);
+            } else {
+              yy -= 1;
+              ym = 12;
+              yd = 31;
+            }
+            int yesterday_ymd = yy * 10000 + ym * 100 + yd;
 
-            // Second-pass cleanup for slots auto-paused by target SOC:
-            // - Repeating slots re-activate once their window has ended
-            //   (ready to run again at the next occurrence).
-            // - Non-repeating slots are deleted once their window has ended.
+            auto in_time_window = [&](int s, int e) -> bool {
+              return (s > e) ? (now_mins >= s || now_mins < e) : (now_mins >= s && now_mins < e);
+            };
+            auto wrap_leftover = [&](int s, int e) -> bool {
+              return s > e && now_mins < e;
+            };
+            auto monday0 = [](int esphome_dow) -> int { return (esphome_dow + 5) % 7; };
+            auto date_matches = [&](int i, int anchor_ymd, int anchor_dow) -> bool {
+              uint8_t rmode = id(inverter${inverter_id}_s_repeat_mode)[i];
+              if (rmode == 0) return true;
+              if (rmode == 1) return (id(inverter${inverter_id}_s_selected_days)[i] & (1 << monday0(anchor_dow))) != 0;
+              if (rmode == 2) return anchor_ymd == id(inverter${inverter_id}_s_date_start)[i];
+              if (rmode == 3) {
+                int ds = id(inverter${inverter_id}_s_date_start)[i];
+                int de = id(inverter${inverter_id}_s_date_end)[i];
+                return ds <= anchor_ymd && anchor_ymd <= de;
+              }
+              return false;
+            };
+            auto should_wipe_expired = [&](int i) -> bool {
+              uint8_t rmode = id(inverter${inverter_id}_s_repeat_mode)[i];
+              int s = id(inverter${inverter_id}_s_start_mins)[i];
+              int e = id(inverter${inverter_id}_s_end_mins)[i];
+              int limit = (rmode == 2) ? id(inverter${inverter_id}_s_date_start)[i]
+                                       : id(inverter${inverter_id}_s_date_end)[i];
+              if (wrap_leftover(s, e) && yesterday_ymd == limit) return false;
+              if (rmode == 2) return today_ymd > id(inverter${inverter_id}_s_date_start)[i];
+              if (rmode == 3) return today_ymd > id(inverter${inverter_id}_s_date_end)[i];
+              return false;
+            };
+
+            for (int i = 0; i < MAX_SLOTS; i++) {
+              int s = id(inverter${inverter_id}_s_start_mins)[i];
+              int e = id(inverter${inverter_id}_s_end_mins)[i];
+              if (should_wipe_expired(i) && !in_time_window(s, e)) {
+                uint8_t rmode = id(inverter${inverter_id}_s_repeat_mode)[i];
+                if (rmode == 2 || rmode == 3) {
+                  id(inverter${inverter_id}_wipe_slot).execute(i);
+                }
+              }
+            }
+
+            // Auto-pause cleanup: daily/selected-days/range resume after the window;
+            // once (and expired range) are deleted.
             for (int i = 0; i < MAX_SLOTS; i++) {
               if (id(inverter${inverter_id}_s_paused_by_target)[i]) {
                 int ps = id(inverter${inverter_id}_s_start_mins)[i];
                 int pe = id(inverter${inverter_id}_s_end_mins)[i];
-                bool p_in_win = (ps > pe)
-                  ? (now_mins >= ps || now_mins < pe)
-                  : (now_mins >= ps && now_mins < pe);
-                if (!p_in_win) {
-                  if (id(inverter${inverter_id}_s_repeat)[i]) {
+                if (!in_time_window(ps, pe)) {
+                  uint8_t rmode = id(inverter${inverter_id}_s_repeat_mode)[i];
+                  bool keep = (rmode == 0 || rmode == 1 || rmode == 3) && !should_wipe_expired(i);
+                  if (keep) {
                     id(inverter${inverter_id}_s_active)[i] = true;
                     id(inverter${inverter_id}_s_paused_by_target)[i] = false;
                     id(inverter${inverter_id}_s_was_active)[i] = false;
@@ -386,9 +535,16 @@ interval:
               if (id(inverter${inverter_id}_s_active)[i]) {
                 int s = id(inverter${inverter_id}_s_start_mins)[i]; 
                 int e = id(inverter${inverter_id}_s_end_mins)[i];
-                bool in_win = (s > e) ? (now_mins >= s || now_mins < e) : (now_mins >= s && now_mins < e);
+                bool in_win = in_time_window(s, e);
+                int anchor_ymd = today_ymd;
+                int anchor_dow = dow;
+                if (wrap_leftover(s, e)) {
+                  anchor_ymd = yesterday_ymd;
+                  anchor_dow = ydow;
+                }
+                bool date_ok = date_matches(i, anchor_ymd, anchor_dow);
                 
-                if (in_win) {
+                if (date_ok && in_win) {
                   active_p = std::min((int)id(inverter${inverter_id}_s_power)[i], MAX_POWER); 
                   active_soc = id(inverter${inverter_id}_s_target_soc)[i];
                   id(inverter${inverter_id}_s_was_active)[i] = true;
@@ -430,8 +586,8 @@ interval:
                   }
 
                   // Auto-Pause: after 3 confirmed ticks (30s) of target-hit,
-                  // pause the slot. Repeating slots auto-reactivate when the
-                  // window ends; non-repeating slots are wiped at window end.
+                  // pause the slot. Daily/selected-days/range slots resume when the
+                  // window ends; once slots are wiped at window end.
                   if (target_hit && id(inverter${inverter_id}_s_auto_pause)[i]) {
                     id(inverter${inverter_id}_s_target_hit_ticks)[i]++;
                     if (id(inverter${inverter_id}_s_target_hit_ticks)[i] >= 3) {

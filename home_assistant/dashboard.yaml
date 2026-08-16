@@ -1,13 +1,13 @@
 # Solis Schedule Dashboard Card (Home Assistant)
-# Updated : 2026.03.30
-# Version : 1.1.0
+# Updated : 2026.08.16
+# Version : 1.2.0
 
 type: vertical-stack
 cards:
   - type: markdown
     title: Inverter Schedules
     content: >-
-      | Slot | Status | Mode | Time Window | SOC | Power | Repeat | Auto Pause |
+      | Slot | Status | Mode | Time Window | SOC | Power | When | Auto Pause |
 
       |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 
@@ -17,7 +17,7 @@ cards:
         {%- for s in data %}
           {%- if s.Mode == 'Idle' or s.Mode == '' %}
             {%- set status = '-' %}
-            {%- set mode, times, soc, pwr, rep, ap = '-', '-', '-', '-', '-', '-' %}
+            {%- set mode, times, soc, pwr, when, ap = '-', '-', '-', '-', '-', '-' %}
           {%- else %}
             {%- if s['Paused By Target'] %}
               {%- set status = '💤' %}
@@ -30,11 +30,26 @@ cards:
             {%- set times = s['Start Time'] ~ " - " ~ s['End Time'] %}
             {%- set soc = s['Target SOC'] ~ "%" %}
             {%- set pwr = (s.Power ~ "W") if (s.Power | int) > 0 else "∞" %}
-            {%- set rep = '✅' if s.Repeat else '❌' %}
+            {%- set rmode = s['Repeat Mode'] | default(0) | int %}
+            {%- if rmode == 1 %}
+              {%- set letters = 'MTWTFSS' %}
+              {%- set mask = s['Selected Days'] | default(0) | int %}
+              {%- set ns = namespace(when='') %}
+              {%- for i in range(7) %}
+                {%- set ns.when = ns.when + (letters[i] if (mask / (2 ** i)) | int is odd else '·') %}
+              {%- endfor %}
+              {%- set when = ns.when %}
+            {%- elif rmode == 2 %}
+              {%- set when = s['Date Start'] | string %}
+            {%- elif rmode == 3 %}
+              {%- set when = (s['Date Start'] | string) ~ '–' ~ (s['Date End'] | string) %}
+            {%- else %}
+              {%- set when = 'Daily' %}
+            {%- endif %}
             {%- set ap = '✅' if s['Auto Pause'] else '❌' %}
           {%- endif %}
       | {{ s.Slot }} | {{ status }} | {{ mode }} | {{ times }} | {{ soc }} | {{
-      pwr }} | {{ rep }} | {{ ap }} |
+      pwr }} | {{ when }} | {{ ap }} |
         {%- endfor %}
       {%- else %}
 
@@ -53,3 +68,6 @@ cards:
       - entity: script.solis_schedule_slot_control
         name: Pause / Resume / Delete Slot
         action_name: CONFIGURE
+      - entity: script.solis_schedule_delete_all
+        name: Delete All Slots
+        action_name: DELETE ALL

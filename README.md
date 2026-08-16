@@ -8,7 +8,7 @@ ESPHome configuration for the Solis EH1 hybrid inverter, including schedule mana
 
 ### Option A — Package File (Recommended)
 
-A single YAML file that installs the template sensor and both scripts in one step.
+A single YAML file that installs the template sensor and schedule scripts in one step.
 
 1. Copy [`home_assistant/solis_schedule_package.yaml`](home_assistant/solis_schedule_package.yaml) into your `config/packages/` directory.
 2. Add the following to your `configuration.yaml` if not already present:
@@ -22,6 +22,7 @@ This creates:
 - `sensor.solis_master_schedule` — live schedule data from the inverter
 - `script.solis_schedule_manager` — create or edit schedule slots
 - `script.solis_schedule_slot_control` — pause, resume, or delete slots
+- `script.solis_schedule_delete_all` — delete every slot in one go
 
 ---
 
@@ -36,6 +37,10 @@ Import each script individually via the My Home Assistant buttons below. The blu
 #### Solis: Schedule Slot Control
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FMrPabloUK%2FESPhome-Solis-EH1%2Fmain%2Fhome_assistant%2Fblueprints%2Fsolis_schedule_slot_control.yaml)
+
+#### Solis: Delete All Schedules
+
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2FMrPabloUK%2FESPhome-Solis-EH1%2Fmain%2Fhome_assistant%2Fblueprints%2Fsolis_schedule_delete_all.yaml)
 
 > **Note:** The template sensor (`sensor.solis_master_schedule`) cannot be imported as a blueprint. If you use Option B, also add the contents of [`home_assistant/templates.yaml`](home_assistant/templates.yaml) to your HA `template:` configuration, or use the package file from Option A instead.
 

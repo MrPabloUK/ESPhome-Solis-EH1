@@ -23,6 +23,7 @@ modbus_controller:
     address: ${inverter_modbus_address}
     update_interval: ${inverter_update_interval}
     setup_priority: -10
+    max_cmd_retries: 1
     offline_skip_updates: 10
 
 packages:

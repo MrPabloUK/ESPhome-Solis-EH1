@@ -1,5 +1,5 @@
-# Updated : 2026.03.30
-# Version : 1.1.0
+# Updated : 2026.08.16
+# Version : 1.2.0
 
 blueprint:
   name: "Solis: Create/Edit Schedule"
@@ -7,7 +7,7 @@ blueprint:
     Create or update a Solis inverter schedule slot via ESPHome.
     Configure the ESPHome action prefix to match your device
     (e.g. `solisinverter_inverter1` for the default hostname).
-    Includes Auto-Pause on Target SOC option.
+    Includes Auto-Pause on Target SOC and date-aware repeat modes.
   domain: script
   source_url: https://raw.githubusercontent.com/MrPabloUK/ESPhome-Solis-EH1/main/home_assistant/blueprints/solis_schedule_manager.yaml
   input:
@@ -79,18 +79,63 @@ fields:
         min: 0
         max: 6000
         unit_of_measurement: W
-  repeat_day:
-    name: Repeat Daily
+  repeat_mode:
+    name: Repeat Mode
+    description: Daily, selected days, a single date, or an inclusive date range.
     required: true
-    default: false
+    default: '0'
     selector:
-      boolean: {}
+      select:
+        options:
+        - label: Daily
+          value: '0'
+        - label: Selected days
+          value: '1'
+        - label: Once
+          value: '2'
+        - label: Date range
+          value: '3'
+  selected_days:
+    name: Days
+    description: Used when Repeat Mode is Selected days. Monday is bit 0.
+    required: false
+    default: []
+    selector:
+      select:
+        multiple: true
+        options:
+        - label: Monday
+          value: '0'
+        - label: Tuesday
+          value: '1'
+        - label: Wednesday
+          value: '2'
+        - label: Thursday
+          value: '3'
+        - label: Friday
+          value: '4'
+        - label: Saturday
+          value: '5'
+        - label: Sunday
+          value: '6'
+  date_start:
+    name: Start Date
+    description: Required for Once and Date range (YYYY-MM-DD).
+    required: false
+    selector:
+      date: {}
+  date_end:
+    name: End Date
+    description: Required for Date range (inclusive).
+    required: false
+    selector:
+      date: {}
   auto_pause:
     name: Auto Pause on Target
     description: >-
       Pause the slot once the SOC target is reached (confirmed for 30s).
-      Repeating slots auto-resume at the end of the time window; non-repeating
-      slots are deleted at the end of the time window.
+      Daily, selected-days, and date-range slots resume at the end of the time
+      window; once slots are deleted at the end of the time window.
     required: true
     default: false
     selector:
@@ -107,7 +152,11 @@ sequence:
     End_Minute: '{{ end_t.split('':'')[1] | int }}'
     Target_SOC_Percent: '{{ target_soc | int }}'
     Power_Limit_Watts: '{{ limit_watts | int }}'
-    Repeat_Daily: '{{ repeat_day }}'
+    Repeat_Daily: '{{ repeat_mode != ''2'' }}'
+    Repeat_Mode: '{{ repeat_mode | int }}'
+    Selected_Days: '{% set ns = namespace(mask=0) %}{% for d in selected_days | default([]) %}{% set ns.mask = ns.mask + (2 ** (d | int)) %}{% endfor %}{{ ns.mask }}'
+    Date_Start: '{{ (date_start | replace(''-'', '''') | int) if date_start is defined and date_start else 0 }}'
+    Date_End: '{{ (date_end | replace(''-'', '''') | int) if date_end is defined and date_end else 0 }}'
     Auto_Pause_On_Target: '{{ auto_pause }}'
 
 mode: single

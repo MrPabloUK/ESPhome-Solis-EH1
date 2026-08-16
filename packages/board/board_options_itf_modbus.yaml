@@ -1,5 +1,5 @@
-# Updated : 2026.01.22
-# Version : 1.0.0
+# Updated : 2026.08.16
+# Version : 1.1.0
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 
 # Solis EH1 Controller
@@ -17,10 +17,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
 
-external_components:
-  - source: github://pr#12612
-    components: [uart, modbus, modbus_controller, modbus_server]
-    refresh: 0s
+# Requires ESPHome 2026.7 or later (stock uart / modbus / modbus_controller).
+
+substitutions:
+  # UART
+  modbus_baud_rate: '9600' # 9600 / 19200 / 115200
+  # Modbus
+  modbus_send_wait_time: '150ms' # Timeout: max time to wait for the FIRST byte of a response
+  modbus_turnaround_time: '125ms' # Pause after a completed response before the next command
 
 uart:
   - id: !extend ${modbus_uart_id}
@@ -31,4 +35,4 @@ modbus:
     id: ${modbus_id}
     role: ${modbus_role}
     send_wait_time: ${modbus_send_wait_time}
-    turnaround_time: ${turnaround_time}
+    turnaround_time: ${modbus_turnaround_time}

@@ -84,7 +84,17 @@ packages:
   # UART 1 (uart_id: uart_esp_1)
   uart_esp_1: !include 
     file: packages/board/board_options_itf_uart_esp_1.yaml
- 
+
+  # Modbus client on UART 1
+  inverter_modbus: !include
+    file: packages/board/board_options_itf_modbus.yaml
+    vars:
+      modbus_id: 'solis_modbus'
+      modbus_role: 'client' # Client / Server
+      modbus_uart_id: 'uart_esp_1' # RS485 board
+      modbus_baud_rate: '9600' # 9600 / 19200 / 115200
+      modbus_send_wait_time: '150ms' # Timeout: max time to wait for the FIRST byte of a response
+      modbus_turnaround_time: '125ms' # Pause after a completed response before the next command
 
   # +------------------------------------------------------------------------------+
   # | >>> Inverter
@@ -94,16 +104,6 @@ packages:
 
   # >>> Copy your Inverter packages here
 
-  inverter_modbus: !include
-    file: packages/base/device_modbus.yaml
-    vars:
-      modbus_id: 'solis_modbus'
-      modbus_role: 'client' # Client / Server
-      modbus_uart_id: 'uart_esp_1' # RS485 board
-      modbus_baud_rate: '9600' # 9600 / 19200 / 115200
-      modbus_send_wait_time: '150ms' # Time in milliseconds before the next ModBUS command is sent if an answer from a previous command is pending
-      turnaround_time: '125ms' # Time in milliseconds Between ModBUS commands
-    
   solis_inverter: !include
     file: packages/inverter/inverter_solis_eh1_full.yaml
     vars:
