@@ -23,7 +23,11 @@ modbus_controller:
     address: ${inverter_modbus_address}
     update_interval: ${inverter_update_interval}
     setup_priority: -10
+    max_cmd_retries: 1
     offline_skip_updates: 10
+    # 1s is tight at 9600 baud. Holding/config registers must use
+    # skip_updates so only the three input-register blocks
+    # (33029/33133/33251) run every cycle. Use 2s if duplicates persist.
 
 packages:
   inverter_sensors: !include inverter_solis_eh1_sensors.yaml

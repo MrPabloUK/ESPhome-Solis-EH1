@@ -1,5 +1,5 @@
-# Updated : 2026.02.03
-# Version : 1.1.8
+# Updated : 2026.08.16
+# Version : 1.2.1
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 
 # Solis EH1 Controller
@@ -17,7 +17,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
 
-# https://wiki.lilygo.cc/get_started/en/High_speed/T-Connect/T-Connect.html
+# https://lilygo.cc/en-us/products/t-connect
+# https://wiki.lilygo.cc/products/t-connect-series/t-connect/
+# https://github.com/Xinyuan-LilyGO/T-Connect
 
 # GPIOs header : pins that can be used without risk
 # 1, 2, 11, 12, 13, 14, 21, 38, 48
@@ -43,8 +45,10 @@ substitutions:
   spi_miso_pin: "13"
   spi_clk_pin: "12"
   mcp2515_cs_pin: "14"
-  # Requirement: RGB flag to show functionality is available
-  board_has_rgb: "true"
+  # LED
+  board_has_rgb: "true" # LED `RGB` flag to show functionality is available
+  # LOOP_TASK_STACK
+  loop_task_stack_size: "8192" # see LOOP_TASK_STACK.md before changing
 
 packages:
   device_base: !include ../base/device_base.yaml
@@ -52,12 +56,13 @@ packages:
   led_control: !include board_options_led_control.yaml
 
 esp32:
-  board: esp32-s3-devkitc-1
   variant: esp32s3
   flash_size: 16MB # adjust according to your ESP32-S3 version
   cpu_frequency: 240MHz
   framework:
     type: esp-idf
+    advanced:
+      loop_task_stack_size: ${loop_task_stack_size}
 
 esphome:
   platformio_options:
