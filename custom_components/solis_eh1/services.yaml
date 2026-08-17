@@ -1,0 +1,164 @@
+upsert_schedule:
+  name: Create or update schedule
+  description: Create or replace one inverter schedule slot.
+  fields:
+    entity_id:
+      name: Schedule sensor
+      description: The Solis EH1 schedule sensor for this stick.
+      required: true
+      selector:
+        entity:
+          integration: solis_eh1
+          domain: sensor
+    slot:
+      name: Slot
+      description: Slot 1 has the highest priority if windows overlap.
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 12
+          mode: box
+    mode:
+      name: Mode
+      required: true
+      example: charge
+      selector:
+        select:
+          options:
+            - label: Charge
+              value: charge
+            - label: Discharge
+              value: discharge
+    start:
+      name: Start
+      required: true
+      selector:
+        time:
+    end:
+      name: End
+      required: true
+      selector:
+        time:
+    target_soc:
+      name: Target SOC
+      required: true
+      default: 100
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+          mode: box
+    power:
+      name: Power
+      description: Set to 0 for unlimited.
+      required: true
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 6000
+          unit_of_measurement: W
+          mode: box
+    repeat:
+      name: Repeat
+      required: true
+      example: daily
+      selector:
+        select:
+          options:
+            - label: Daily
+              value: daily
+            - label: Selected days
+              value: selected_days
+            - label: Once
+              value: once
+            - label: Date range
+              value: date_range
+    days:
+      name: Days
+      description: Used when Repeat is Selected days. Monday is the first day.
+      required: false
+      selector:
+        select:
+          multiple: true
+          options:
+            - label: Monday
+              value: monday
+            - label: Tuesday
+              value: tuesday
+            - label: Wednesday
+              value: wednesday
+            - label: Thursday
+              value: thursday
+            - label: Friday
+              value: friday
+            - label: Saturday
+              value: saturday
+            - label: Sunday
+              value: sunday
+    date_start:
+      name: Start date
+      description: Required for Once and Date range.
+      required: false
+      selector:
+        date:
+    date_end:
+      name: End date
+      description: Required for Date range (inclusive).
+      required: false
+      selector:
+        date:
+    auto_pause:
+      name: Auto-pause when target reached
+      description: Daily, selected-days, and date-range slots resume after the window. Once slots are deleted.
+      required: false
+      default: false
+      selector:
+        boolean:
+
+manage_slot:
+  name: Manage slot
+  description: Delete, pause, or resume one schedule slot.
+  fields:
+    entity_id:
+      name: Schedule sensor
+      required: true
+      selector:
+        entity:
+          integration: solis_eh1
+          domain: sensor
+    slot:
+      name: Slot
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 12
+          mode: box
+    action:
+      name: Action
+      required: true
+      selector:
+        select:
+          options:
+            - label: Delete
+              value: delete
+            - label: Pause
+              value: pause
+            - label: Resume
+              value: resume
+
+delete_all_schedules:
+  name: Delete all schedules
+  description: Wipe every schedule slot on the selected stick.
+  fields:
+    entity_id:
+      name: Schedule sensor
+      required: true
+      selector:
+        entity:
+          integration: solis_eh1
+          domain: sensor

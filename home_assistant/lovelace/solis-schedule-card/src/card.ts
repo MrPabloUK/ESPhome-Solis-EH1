@@ -1,8 +1,8 @@
 import { LitElement, html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { state } from "lit/decorators.js";
 import {
   DAY_NAMES,
-  draftToUpsert,
+  draftToWrapper,
   emptyDraft,
   firstEmptySlot,
   occupiedSlotNumbers,
@@ -31,7 +31,6 @@ import {
   type SlotDraft,
 } from "./types";
 
-@customElement("solis-schedule-card")
 export class SolisScheduleCard extends LitElement {
   static styles = cardStyles;
 
@@ -49,8 +48,7 @@ export class SolisScheduleCard extends LitElement {
 
   static getStubConfig(): CardConfig {
     return {
-      entity: "sensor.solis_master_schedule",
-      device_prefix: "solisinverter_inverter1",
+      entity: "sensor.solis_eh1_schedule",
     };
   }
 
@@ -60,7 +58,6 @@ export class SolisScheduleCard extends LitElement {
 
   setConfig(config: CardConfig) {
     if (!config?.entity) throw new Error("entity is required");
-    if (!config.device_prefix) throw new Error("device_prefix is required");
     this._config = config;
   }
 
@@ -92,16 +89,12 @@ export class SolisScheduleCard extends LitElement {
     return this._slots.find((slot) => slot.Slot === slotNumber);
   }
 
-  private _service(name: "upsert_schedule" | "manage_slot_status" | "delete_all_schedules") {
-    return `${this._config!.device_prefix}_${name}`;
-  }
-
-  private async _call(service: string, data?: Record<string, unknown>) {
+  private async _call(service: "upsert_schedule" | "manage_slot" | "delete_all_schedules", data?: Record<string, unknown>) {
     if (!this._hass) return;
     this._busy = true;
     this._error = "";
     try {
-      await this._hass.callService("esphome", service, data);
+      await this._hass.callService("solis_eh1", service, data);
     } catch (err) {
       this._error = err instanceof Error ? err.message : "Home Assistant action failed.";
     } finally {
@@ -148,21 +141,23 @@ export class SolisScheduleCard extends LitElement {
       this._error = problem;
       return;
     }
-    await this._call(this._service("upsert_schedule"), draftToUpsert(this._draft));
+    await this._call("upsert_schedule", draftToWrapper(this._config!.entity, this._draft));
     if (!this._error) this._closeEditor();
   }
 
   private async _manage(slotNumber: number, instruction: 0 | 1 | 2) {
     this._menuSlot = null;
-    await this._call(this._service("manage_slot_status"), {
-      Slot_Number: slotNumber,
-      Instruction: instruction,
+    const action = instruction === 0 ? "delete" : instruction === 1 ? "pause" : "resume";
+    await this._call("manage_slot", {
+      entity_id: this._config!.entity,
+      slot: slotNumber,
+      action,
     });
     if (instruction === 0 && this._draft?.slot === slotNumber) this._closeEditor();
   }
 
   private async _deleteAll() {
-    await this._call(this._service("delete_all_schedules"));
+    await this._call("delete_all_schedules", { entity_id: this._config!.entity });
     this._confirmDeleteAll = false;
     this._closeEditor();
   }

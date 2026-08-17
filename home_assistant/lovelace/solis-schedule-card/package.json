@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "vendor": "vite build && node ./scripts/vendor.mjs"
   },
   "dependencies": {
     "lit": "^3.2.1"

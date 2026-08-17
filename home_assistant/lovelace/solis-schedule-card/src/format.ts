@@ -12,6 +12,8 @@ import {
 
 export const DAY_LETTERS = ["M", "T", "W", "T", "F", "S", "S"] as const;
 export const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+export const DAY_VALUES = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
+export const REPEAT_VALUES = ["daily", "selected_days", "once", "date_range"] as const;
 
 export function daysInMonth(month: number, year: number): number {
   const dim = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -182,6 +184,23 @@ export function validateDraft(draft: SlotDraft): string | null {
     if (start > end) return "Date range start must be on or before the end date.";
   }
   return null;
+}
+
+export function draftToWrapper(entityId: string, draft: SlotDraft): Record<string, unknown> {
+  return {
+    entity_id: entityId,
+    slot: draft.slot,
+    mode: draft.operationMode === 1 ? "charge" : "discharge",
+    start: draft.start,
+    end: draft.end,
+    target_soc: draft.targetSoc,
+    power: draft.power,
+    repeat: REPEAT_VALUES[draft.repeatMode],
+    days: draft.selectedDays.map((day) => DAY_VALUES[day]),
+    date_start: draft.dateStart || undefined,
+    date_end: draft.dateEnd || undefined,
+    auto_pause: draft.autoPause,
+  };
 }
 
 export function draftToUpsert(draft: SlotDraft): Record<string, unknown> {

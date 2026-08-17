@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   daysToMask,
   draftToUpsert,
+  draftToWrapper,
   firstEmptySlot,
   occupiedSlotNumbers,
   slotSelectLabel,
@@ -115,6 +116,24 @@ describe("draft validation and upsert payload", () => {
 
     const range = slotToDraft(slot({ "Repeat Mode": MODE_RANGE, "Date Start": 20260820, "Date End": 20260810 }));
     expect(validateDraft(range)).toBe("Date range start must be on or before the end date.");
+  });
+
+  it("builds the Solis EH1 wrapper payload", () => {
+    const payload = draftToWrapper(
+      "sensor.solis_eh1_schedule",
+      slotToDraft(
+        slot({
+          Mode: "Discharge",
+          "Repeat Mode": MODE_SELECTED_DAYS,
+          "Selected Days": 0b0010101,
+        }),
+      ),
+    );
+    expect(payload.entity_id).toBe("sensor.solis_eh1_schedule");
+    expect(payload.mode).toBe("discharge");
+    expect(payload.repeat).toBe("selected_days");
+    expect(payload.days).toEqual(["monday", "wednesday", "friday"]);
+    expect(payload.auto_pause).toBe(false);
   });
 
   it("builds the ESPHome upsert payload", () => {

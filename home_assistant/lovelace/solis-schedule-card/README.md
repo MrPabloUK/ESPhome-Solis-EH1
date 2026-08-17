@@ -1,34 +1,15 @@
 # Solis Schedule Card
 
-Custom Lovelace card for listing and editing Solis EH1 schedule slots.
+Lovelace card source for listing and editing Solis EH1 schedule slots.
 
-The card reads `sensor.solis_master_schedule` and writes through the existing ESPHome actions. The YAML scripts remain available as a fallback.
+Home Assistant users get this card from the **Solis EH1** integration. Do not copy the JS to `/config/www` unless you are developing without the integration.
 
-## Install
+The card reads the integration schedule sensor and writes through `solis_eh1.upsert_schedule`, `solis_eh1.manage_slot`, and `solis_eh1.delete_all_schedules`.
 
-1. Copy `dist/solis-schedule-card.js` to Home Assistant `/config/www/solis-schedule-card.js`.
-2. Add a Lovelace resource:
-   - **Settings → Dashboards → Resources → Add resource**
-   - URL: `/local/solis-schedule-card.js`
-   - Type: **JavaScript module**
-
-   Or in `configuration.yaml`:
-
-   ```yaml
-   frontend:
-     extra_module_url:
-       - /local/solis-schedule-card.js
-   ```
-
-3. Restart Home Assistant or reload resources, then add a **Manual** card:
-
-   ```yaml
-   type: custom:solis-schedule-card
-   entity: sensor.solis_master_schedule
-   device_prefix: solisinverter_inverter1
-   ```
-
-`device_prefix` must match the ESPHome action prefix (Developer Tools → Actions, search `esphome`).
+```yaml
+type: custom:solis-schedule-card
+entity: sensor.solis_eh1_schedule
+```
 
 Optional: `show_empty: true` lists all 12 slots, including empty ones.
 
@@ -37,7 +18,7 @@ Optional: `show_empty: true` lists all 12 slots, including empty ones.
 ```bash
 npm install
 npm test
-npm run build
+npm run vendor
 ```
 
-The built module is written to `dist/solis-schedule-card.js`.
+`vendor` builds `dist/solis-schedule-card.js` and copies it to `custom_components/solis_eh1/www/`.

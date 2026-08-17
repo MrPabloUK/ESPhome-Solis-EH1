@@ -274,7 +274,7 @@ script:
   - id: inverter${inverter_id}_push_schedules_to_ha
     then:
       - homeassistant.event:
-          event: esphome.solis_inverter${inverter_id}_schedule_update
+          event: esphome.${hostname}_inverter${inverter_id}_schedule_update
           data_template:
             schedules: !lambda |-
               std::string json;

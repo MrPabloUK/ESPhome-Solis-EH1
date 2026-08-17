@@ -30,7 +30,6 @@ export interface ScheduleSlot {
 export interface CardConfig {
   type?: string;
   entity: string;
-  device_prefix: string;
   show_empty?: boolean;
 }
 

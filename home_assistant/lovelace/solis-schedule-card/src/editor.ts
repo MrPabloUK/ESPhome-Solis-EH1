@@ -1,9 +1,8 @@
 import { LitElement, html } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { state } from "lit/decorators.js";
 import { editorStyles } from "./styles";
 import type { CardConfig, HomeAssistant } from "./types";
 
-@customElement("solis-schedule-card-editor")
 export class SolisScheduleCardEditor extends LitElement {
   static styles = editorStyles;
 
@@ -33,14 +32,6 @@ export class SolisScheduleCardEditor extends LitElement {
             type="text"
             .value=${this._config.entity}
             @change=${(ev: Event) => this._update({ entity: (ev.target as HTMLInputElement).value })}
-          />
-        </label>
-        <label>
-          ESPHome action prefix
-          <input
-            type="text"
-            .value=${this._config.device_prefix}
-            @change=${(ev: Event) => this._update({ device_prefix: (ev.target as HTMLInputElement).value })}
           />
         </label>
         <label>
