@@ -6,7 +6,7 @@ DOMAIN = "solis_eh1"
 MANUFACTURER = "MrPabloUK"
 MODEL = "Solis-EH1-Controller"
 PROJECT_NAME = "MrPabloUK.Solis-EH1-Controller"
-VERSION = "1.2.0"
+VERSION = "1.2.2"
 
 CONF_DEVICE_ID = "device_id"
 CONF_ESPHOME_NAME = "esphome_name"

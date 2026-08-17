@@ -1,8 +1,9 @@
 # Updated : 2026.08.16
-# Version : 1.2.1
+# Version : 1.2.2
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 #
 # Changelog:
+#   1.2.2 - Send schedule JSON as event data, not a Home Assistant template.
 #   1.2.1 - Skip holding-register polls most cycles so 1s input-register
 #           reads are not queued twice (ESPHome duplicate command warnings).
 #   1.2.0 - Date-aware slots: daily, selected days, once, and date range.
@@ -275,7 +276,7 @@ script:
     then:
       - homeassistant.event:
           event: esphome.${hostname}_inverter${inverter_id}_schedule_update
-          data_template:
+          data:
             schedules: !lambda |-
               std::string json;
               json.reserve(${slot_count} * 320);

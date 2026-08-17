@@ -17,6 +17,7 @@ The stick owns the schedule clock. Home Assistant stores a live copy, offers rea
 2. Uncomment the matching board package in the YAML.
 3. Compile and flash with ESPHome (dashboard or CLI). Minimum ESPHome **2026.7.0**.
 4. In Home Assistant, adopt the device in the built-in **ESPHome** integration.
+5. Open that ESPHome device → **Configure** and enable **Allow the device to perform Home Assistant actions**. Without this, schedule events never reach Home Assistant and the Schedule sensor stays on `waiting`.
 
 The firmware advertises project `MrPabloUK.Solis-EH1-Controller` so the Solis EH1 integration can find it.
 

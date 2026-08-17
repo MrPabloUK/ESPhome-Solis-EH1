@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Solis EH1",
-        "description": "Pick an adopted Solis EH1 ESPHome device.",
+        "description": "Pick an adopted Solis EH1 ESPHome device. On that ESPHome device, enable Allow the device to perform Home Assistant actions or the Schedule sensor stays on waiting.",
         "data": {
           "device_id": "Device"
         }
