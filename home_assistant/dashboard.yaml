@@ -1,73 +1,11 @@
 # Solis Schedule Dashboard Card (Home Assistant)
 # Updated : 2026.08.16
 # Version : 1.2.0
+#
+# Requires the custom card from
+# home_assistant/lovelace/solis-schedule-card/dist/solis-schedule-card.js
+# Markdown fallback: home_assistant/dashboard_markdown.yaml
 
-type: vertical-stack
-cards:
-  - type: markdown
-    title: Inverter Schedules
-    content: >-
-      | Slot | Status | Mode | Time Window | SOC | Power | When | Auto Pause |
-
-      |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-
-      {%- set data = state_attr('sensor.solis_master_schedule', 'data') %}
-
-      {%- if data is not none and data is iterable %}
-        {%- for s in data %}
-          {%- if s.Mode == 'Idle' or s.Mode == '' %}
-            {%- set status = '-' %}
-            {%- set mode, times, soc, pwr, when, ap = '-', '-', '-', '-', '-', '-' %}
-          {%- else %}
-            {%- if s['Paused By Target'] %}
-              {%- set status = '💤' %}
-            {%- elif s.Active %}
-              {%- set status = '✅' %}
-            {%- else %}
-              {%- set status = '⏸' %}
-            {%- endif %}
-            {%- set mode = s.Mode %}
-            {%- set times = s['Start Time'] ~ " - " ~ s['End Time'] %}
-            {%- set soc = s['Target SOC'] ~ "%" %}
-            {%- set pwr = (s.Power ~ "W") if (s.Power | int) > 0 else "∞" %}
-            {%- set rmode = s['Repeat Mode'] | default(0) | int %}
-            {%- if rmode == 1 %}
-              {%- set letters = 'MTWTFSS' %}
-              {%- set mask = s['Selected Days'] | default(0) | int %}
-              {%- set ns = namespace(when='') %}
-              {%- for i in range(7) %}
-                {%- set ns.when = ns.when + (letters[i] if (mask / (2 ** i)) | int is odd else '·') %}
-              {%- endfor %}
-              {%- set when = ns.when %}
-            {%- elif rmode == 2 %}
-              {%- set when = s['Date Start'] | string %}
-            {%- elif rmode == 3 %}
-              {%- set when = (s['Date Start'] | string) ~ '–' ~ (s['Date End'] | string) %}
-            {%- else %}
-              {%- set when = 'Daily' %}
-            {%- endif %}
-            {%- set ap = '✅' if s['Auto Pause'] else '❌' %}
-          {%- endif %}
-      | {{ s.Slot }} | {{ status }} | {{ mode }} | {{ times }} | {{ soc }} | {{
-      pwr }} | {{ when }} | {{ ap }} |
-        {%- endfor %}
-      {%- else %}
-
-      | | | No data received yet | | | | | |
-
-      {%- endif %}
-
-
-      Status legend: ✅ Active · ⏸ Paused · 💤 Auto-Paused (target reached)
-  - type: entities
-    show_header_toggle: false
-    entities:
-      - entity: script.solis_schedule_manager
-        name: Setup or Edit Slot
-        action_name: CONFIGURE
-      - entity: script.solis_schedule_slot_control
-        name: Pause / Resume / Delete Slot
-        action_name: CONFIGURE
-      - entity: script.solis_schedule_delete_all
-        name: Delete All Slots
-        action_name: DELETE ALL
+type: custom:solis-schedule-card
+entity: sensor.solis_master_schedule
+device_prefix: solisinverter_inverter1

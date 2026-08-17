@@ -46,9 +46,21 @@ Import each script individually via the My Home Assistant buttons below. The blu
 
 ---
 
-### Dashboard Card
+### Lovelace card (recommended UI)
 
-A pre-built Lovelace card showing all schedule slots is available in [`home_assistant/dashboard.yaml`](home_assistant/dashboard.yaml). Add it via the dashboard card editor using **Manual card**.
+A custom card lists live slots and edits them with conditional fields (days only for Selected days, dates only for Once / Date range).
+
+1. Copy [`home_assistant/lovelace/solis-schedule-card/dist/solis-schedule-card.js`](home_assistant/lovelace/solis-schedule-card/dist/solis-schedule-card.js) to `/config/www/solis-schedule-card.js`.
+2. Add a Lovelace resource of type **JavaScript module** with URL `/local/solis-schedule-card.js` (or use `frontend.extra_module_url`).
+3. Add a Manual card:
+
+   ```yaml
+   type: custom:solis-schedule-card
+   entity: sensor.solis_master_schedule
+   device_prefix: solisinverter_inverter1
+   ```
+
+See [`home_assistant/lovelace/solis-schedule-card/README.md`](home_assistant/lovelace/solis-schedule-card/README.md) for build notes. The YAML scripts above remain as a fallback. A markdown table card is in [`home_assistant/dashboard_markdown.yaml`](home_assistant/dashboard_markdown.yaml).
 
 ---
 

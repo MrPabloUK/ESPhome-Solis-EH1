@@ -104,7 +104,6 @@ script:
         name: Days
         description: Used when Repeat Mode is Selected days. Monday is bit 0.
         required: false
-        default: []
         selector:
           select:
             multiple: true
