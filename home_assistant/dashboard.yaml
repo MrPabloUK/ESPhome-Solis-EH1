@@ -40,9 +40,14 @@ cards:
               {%- endfor %}
               {%- set when = ns.when %}
             {%- elif rmode == 2 %}
-              {%- set when = s['Date Start'] | string %}
+              {%- set ymd = s['Date Start'] | string %}
+              {%- set when = ymd[:4] ~ '-' ~ ymd[4:6] ~ '-' ~ ymd[6:8] if ymd | length == 8 else ymd %}
             {%- elif rmode == 3 %}
-              {%- set when = (s['Date Start'] | string) ~ '–' ~ (s['Date End'] | string) %}
+              {%- set ds = s['Date Start'] | string %}
+              {%- set de = s['Date End'] | string %}
+              {%- set start = ds[:4] ~ '-' ~ ds[4:6] ~ '-' ~ ds[6:8] if ds | length == 8 else ds %}
+              {%- set end = de[:4] ~ '-' ~ de[4:6] ~ '-' ~ de[6:8] if de | length == 8 else de %}
+              {%- set when = start ~ '–' ~ end %}
             {%- else %}
               {%- set when = 'Daily' %}
             {%- endif %}
