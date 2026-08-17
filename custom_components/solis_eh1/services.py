@@ -18,6 +18,7 @@ from .const import (
     DOMAIN,
     ESPHOME_DELETE_ALL,
     ESPHOME_MANAGE,
+    ESPHOME_PUSH,
     ESPHOME_UPSERT,
     SERVICE_DELETE_ALL,
     SERVICE_MANAGE,
@@ -93,6 +94,10 @@ def _entry_for_call(hass: HomeAssistant, call: ServiceCall):
                         return entry
         raise HomeAssistantError("No Solis EH1 integration for that device.")
     raise HomeAssistantError("Provide entity_id or device_id.")
+
+
+async def async_request_snapshot(hass: HomeAssistant, prefix: str) -> None:
+    await _call_esphome(hass, prefix, ESPHOME_PUSH)
 
 
 async def _call_esphome(hass: HomeAssistant, prefix: str, action: str, data: dict[str, Any] | None = None) -> None:

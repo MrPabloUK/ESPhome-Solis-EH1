@@ -32,7 +32,7 @@ The firmware advertises project `MrPabloUK.Solis-EH1-Controller` so the Solis EH
 
 Alternatively, symlink or copy [`custom_components/solis_eh1/`](custom_components/solis_eh1/) into your HA `custom_components` folder.
 
-This creates a **Schedule** sensor on the same device. It listens for `esphome.{hostname}_inverter{N}_schedule_update` and stores the 12-slot JSON in `attributes.data`.
+This creates a **Schedule** sensor on the same device. On setup it asks the stick for a snapshot, then listens for `esphome.{hostname}_inverter{N}_schedule_update` and stores the 12-slot JSON in `attributes.data`.
 
 ---
 

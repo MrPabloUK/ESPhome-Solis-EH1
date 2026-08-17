@@ -1,8 +1,9 @@
 # Updated : 2026.08.16
-# Version : 1.2.2
+# Version : 1.2.3
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 #
 # Changelog:
+#   1.2.3 - Add push_schedules API action so HA can request a snapshot after setup.
 #   1.2.2 - Send schedule JSON as event data, not a Home Assistant template.
 #   1.2.1 - Skip holding-register polls most cycles so 1s input-register
 #           reads are not queued twice (ESPHome duplicate command warnings).
@@ -157,6 +158,11 @@ api:
     - action: inverter${inverter_id}_delete_all_schedules
       then:
         - script.execute: inverter${inverter_id}_wipe_all_slots
+        - api.respond: { success: true }
+
+    - action: inverter${inverter_id}_push_schedules
+      then:
+        - script.execute: inverter${inverter_id}_push_schedules_to_ha
         - api.respond: { success: true }
 
 # ==============================================================================
