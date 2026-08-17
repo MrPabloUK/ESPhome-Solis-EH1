@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 SUBDEVICE_IDENT_RE = re.compile(
     r"^(?:[0-9a-f]{12}|[0-9a-f]{2}(?::[0-9a-f]{2}){5})[_-](board|inverter[_-]?\d+)$",
@@ -18,6 +19,22 @@ def looks_like_mac(value: str) -> bool:
 
 def looks_like_subdevice_ident(value: str) -> bool:
     return bool(SUBDEVICE_IDENT_RE.match(value.replace(":", ""))) or bool(SUBDEVICE_IDENT_RE.match(value))
+
+
+def identifier_domain(ident: Any) -> str | None:
+    if isinstance(ident, (tuple, list)) and ident:
+        return str(ident[0])
+    return None
+
+
+def identifier_value(ident: Any) -> str | None:
+    if isinstance(ident, (tuple, list)) and len(ident) >= 2:
+        return str(ident[1])
+    return None
+
+
+def has_esphome_identifier(identifiers: Any) -> bool:
+    return any(identifier_domain(ident) == "esphome" for ident in (identifiers or ()))
 
 
 def usable_esphome_name(value: str | None) -> str | None:

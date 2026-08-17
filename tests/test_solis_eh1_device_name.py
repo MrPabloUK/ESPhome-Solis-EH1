@@ -9,7 +9,12 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "custom_components" / "solis_eh1"))
 
-from names import looks_like_mac, looks_like_subdevice_ident, usable_esphome_name  # noqa: E402
+from names import (  # noqa: E402
+    has_esphome_identifier,
+    looks_like_mac,
+    looks_like_subdevice_ident,
+    usable_esphome_name,
+)
 
 
 class DeviceNameTests(unittest.TestCase):
@@ -28,6 +33,11 @@ class DeviceNameTests(unittest.TestCase):
         self.assertIsNone(usable_esphome_name("aabbccddeeff"))
         self.assertIsNone(usable_esphome_name("aabbccddeeff_inverter_1"))
         self.assertIsNone(usable_esphome_name("Solis Controller"))
+
+    def test_long_identifier_tuples(self) -> None:
+        self.assertTrue(has_esphome_identifier({("esphome", "solisinverter")}))
+        self.assertTrue(has_esphome_identifier({("esphome", "solisinverter", "extra", "parts")}))
+        self.assertFalse(has_esphome_identifier({("kasa", "a", "b", "c")}))
 
 
 if __name__ == "__main__":

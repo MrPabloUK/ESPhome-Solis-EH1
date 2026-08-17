@@ -25,6 +25,7 @@ from .const import (
     SERVICE_UPSERT,
 )
 from .mapping import MappingError, manage_payload, upsert_payload
+from .names import identifier_domain, identifier_value
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,11 +87,12 @@ def _entry_for_call(hass: HomeAssistant, call: ServiceCall):
                 return entry
         device = dr.async_get(hass).async_get(device_id)
         if device:
-            for ident_domain, ident in device.identifiers:
-                if ident_domain != "esphome":
+            for ident in device.identifiers or ():
+                if identifier_domain(ident) != "esphome":
                     continue
+                ident_value = identifier_value(ident)
                 for entry in hass.config_entries.async_entries(DOMAIN):
-                    if entry.data.get("esphome_name") == ident:
+                    if entry.data.get("esphome_name") == ident_value:
                         return entry
         raise HomeAssistantError("No Solis EH1 integration for that device.")
     raise HomeAssistantError("Provide entity_id or device_id.")

@@ -10,7 +10,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import DOMAIN, MANUFACTURER, MODEL, SCHEDULE_STATUS_RE
-from .names import usable_esphome_name
+from .names import identifier_domain, identifier_value, usable_esphome_name
 
 STATUS_PATTERN = re.compile(SCHEDULE_STATUS_RE)
 
@@ -54,10 +54,10 @@ def esphome_name_from_device(hass: Any, device: dr.DeviceEntry) -> str | None:
                 return name
 
     for source in (root, device):
-        for domain, ident in source.identifiers:
-            if domain != "esphome":
+        for ident in source.identifiers or ():
+            if identifier_domain(ident) != "esphome":
                 continue
-            name = usable_esphome_name(ident)
+            name = usable_esphome_name(identifier_value(ident))
             if name:
                 return name
 

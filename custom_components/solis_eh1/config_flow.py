@@ -20,6 +20,7 @@ from .const import (
     MODEL,
 )
 from .device import esphome_name_from_device, inverter_id_for_device
+from .names import has_esphome_identifier
 
 
 def used_device_ids(hass) -> set[str]:
@@ -41,7 +42,7 @@ def used_hostnames(hass) -> set[str]:
 def compatible_device(device: dr.DeviceEntry) -> bool:
     if device.manufacturer == MANUFACTURER and device.model == MODEL:
         return True
-    return any(domain == "esphome" for domain, _ident in device.identifiers)
+    return has_esphome_identifier(device.identifiers)
 
 
 class SolisEH1ConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -60,7 +61,7 @@ class SolisEH1ConfigFlow(ConfigFlow, domain=DOMAIN):
             device
             for device in registry.devices.values()
             if device.id not in taken
-            and any(domain == "esphome" for domain, _ident in device.identifiers)
+            and has_esphome_identifier(device.identifiers)
             and compatible_device(device)
         ]
         if not candidates:
