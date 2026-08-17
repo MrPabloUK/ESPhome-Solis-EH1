@@ -1,0 +1,89 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Solis EH1",
+        "description": "Pick an adopted Solis EH1 ESPHome device. On that ESPHome device, enable Allow the device to perform Home Assistant actions or the Schedule sensor stays on waiting.",
+        "data": {
+          "device_id": "Device"
+        }
+      },
+      "manual": {
+        "title": "Solis EH1",
+        "description": "Could not read the ESPHome hostname. Enter it to continue.",
+        "data": {
+          "esphome_name": "ESPHome hostname",
+          "inverter_id": "Inverter ID"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "This device is already configured",
+      "not_solis": "This device is not a Solis EH1 controller"
+    },
+    "abort": {
+      "already_configured": "This device is already configured",
+      "no_devices": "No compatible ESPHome devices found. Flash the firmware and adopt the stick in the ESPHome integration first."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "schedule": {
+        "name": "Schedule"
+      }
+    }
+  },
+  "services": {
+    "upsert_schedule": {
+      "name": "Create or update schedule",
+      "description": "Create or replace one inverter schedule slot.",
+      "fields": {
+        "entity_id": {
+          "name": "Schedule sensor",
+          "description": "The Solis EH1 schedule sensor for this stick."
+        },
+        "slot": {
+          "name": "Slot",
+          "description": "Slot 1 has the highest priority if windows overlap."
+        },
+        "mode": { "name": "Mode" },
+        "start": { "name": "Start" },
+        "end": { "name": "End" },
+        "target_soc": { "name": "Target SOC" },
+        "power": { "name": "Power", "description": "Set to 0 for unlimited." },
+        "repeat": { "name": "Repeat" },
+        "days": {
+          "name": "Days",
+          "description": "Used when Repeat is Selected days."
+        },
+        "date_start": {
+          "name": "Start date",
+          "description": "Required for Once and Date range."
+        },
+        "date_end": {
+          "name": "End date",
+          "description": "Required for Date range (inclusive)."
+        },
+        "auto_pause": {
+          "name": "Auto-pause when target reached"
+        }
+      }
+    },
+    "manage_slot": {
+      "name": "Manage slot",
+      "description": "Delete, pause, or resume one schedule slot.",
+      "fields": {
+        "entity_id": { "name": "Schedule sensor" },
+        "slot": { "name": "Slot" },
+        "action": { "name": "Action" }
+      }
+    },
+    "delete_all_schedules": {
+      "name": "Delete all schedules",
+      "description": "Wipe every schedule slot on the selected stick.",
+      "fields": {
+        "entity_id": { "name": "Schedule sensor" }
+      }
+    }
+  }
+}

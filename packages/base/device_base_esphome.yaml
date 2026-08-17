@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
 
 substitutions:
-  code_version: "1.0.0"
+  code_version: "1.2.3"
 
 esphome:
   name: ${hostname}
