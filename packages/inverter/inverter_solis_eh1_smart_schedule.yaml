@@ -3,9 +3,10 @@
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 #
 # Changelog:
-#   1.3.0 - ESPHome 2026.9: holding hub at 10s, continuous input polls
-#           (5s re-arm), reuse_previous_range, modbus_client writes,
-#           native API action description/example metadata.
+#   1.3.0 - ESPHome 2026.9: _modbus_input continuous (5s re-arm),
+#           _modbus_status at 10s, _modbus_config at 60s (RTC/config),
+#           reuse_previous_range, modbus_client writes, native API
+#           action description/example metadata.
 #   1.2.3 - Add push_schedules API action so HA can request a snapshot after setup.
 #   1.2.2 - Send schedule JSON as event data, not a Home Assistant template.
 #   1.2.1 - Skip holding-register polls most cycles so 1s input-register
@@ -376,7 +377,7 @@ script:
 
 sensor:
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_holding
+    modbus_controller_id: inverter${inverter_id}_modbus_status
     id: inverter${inverter_id}_f_dis
     device_id: inverter_${inverter_id}
     name: "Force Battery Discharge Limit"
@@ -395,7 +396,7 @@ sensor:
     entity_category: diagnostic
 
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_holding
+    modbus_controller_id: inverter${inverter_id}_modbus_status
     id: inverter${inverter_id}_r_chg
     device_id: inverter_${inverter_id}
     name: "Battery Charge Limit"
@@ -414,7 +415,7 @@ sensor:
     entity_category: diagnostic
 
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_holding
+    modbus_controller_id: inverter${inverter_id}_modbus_status
     id: inverter${inverter_id}_r_dis
     device_id: inverter_${inverter_id}
     name: "Battery Discharge Limit"
@@ -433,7 +434,7 @@ sensor:
     entity_category: diagnostic
 
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_holding
+    modbus_controller_id: inverter${inverter_id}_modbus_status
     id: inverter${inverter_id}_f_chg
     device_id: inverter_${inverter_id}
     name: "Force Battery Charge Limit"
@@ -453,7 +454,7 @@ sensor:
 
 select:
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_holding
+    modbus_controller_id: inverter${inverter_id}_modbus_status
     internal: true
     id: inverter${inverter_id}_battery_force_mode_select
     address: 43135

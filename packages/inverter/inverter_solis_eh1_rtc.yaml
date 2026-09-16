@@ -28,7 +28,7 @@ switch:
 
 text_sensor:
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_holding
+    modbus_controller_id: inverter${inverter_id}_modbus_config
     id: inverter${inverter_id}_rtc
     register_type: holding
     address: 43000

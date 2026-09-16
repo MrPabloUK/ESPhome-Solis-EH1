@@ -19,7 +19,7 @@
 
 number:
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_holding
+    modbus_controller_id: inverter${inverter_id}_modbus_config
     device_id: inverter_${inverter_id}
     name: Limit Output Power
     disabled_by_default: false # intentionally disabled, remove if you know what you are doing
@@ -35,7 +35,7 @@ number:
     multiply: 100
 
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_holding
+    modbus_controller_id: inverter${inverter_id}_modbus_config
     device_id: inverter_${inverter_id}
     name: Inverter Power Switch
     id: inverter${inverter_id}_inv_power_sw
@@ -47,7 +47,7 @@ number:
     internal: True
 
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_holding
+    modbus_controller_id: inverter${inverter_id}_modbus_status
     device_id: inverter_${inverter_id}
     name: Storage Control Switches
     register_type: holding
