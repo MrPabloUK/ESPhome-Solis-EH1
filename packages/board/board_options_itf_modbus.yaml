@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
 
-# Requires ESPHome 2026.7 or later (stock uart / modbus / modbus_controller).
+# Requires ESPHome 2026.9 or later (stock uart / modbus / modbus_controller).
 
 substitutions:
   # UART

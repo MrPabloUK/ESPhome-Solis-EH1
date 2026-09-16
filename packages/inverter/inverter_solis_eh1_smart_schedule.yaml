@@ -1,8 +1,12 @@
-# Updated : 2026.08.16
-# Version : 1.2.3
+# Updated : 2026.09.16
+# Version : 1.3.0
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 #
 # Changelog:
+#   1.3.0 - ESPHome 2026.9: _modbus_input (inverter_continuous + interval),
+#           _modbus_status at 10s, _modbus_config at 60s (RTC/config),
+#           reuse_previous_range, modbus_client writes, native API
+#           action description/example metadata.
 #   1.2.3 - Add push_schedules API action so HA can request a snapshot after setup.
 #   1.2.2 - Send schedule JSON as event data, not a Home Assistant template.
 #   1.2.1 - Skip holding-register polls most cycles so 1s input-register
@@ -49,21 +53,64 @@ esphome:
 api:
   actions:
     - action: inverter${inverter_id}_upsert_schedule
+      description: Create or replace one inverter schedule slot.
       variables:
-        Slot_Number: int # User enters 1-12
-        Start_Hour: int # 0-23
-        Start_Minute: int # 0-59
-        End_Hour: int # 0-23
-        End_Minute: int # 0-59
-        Operation_Mode: int # 1=Charge, 2=Discharge
-        Power_Limit_Watts: int # 0-6000
-        Target_SOC_Percent: int # 0-100
-        Repeat_Daily: bool # legacy fallback when Repeat_Mode/date fields are all zero
-        Auto_Pause_On_Target: bool # true/false - pause slot when SOC target reached
-        Repeat_Mode: int # 0=Daily, 1=Selected days, 2=Once, 3=Date range
-        Selected_Days: int # bit0=Mon .. bit6=Sun (mode 1)
-        Date_Start: int # YYYYMMDD or 0
-        Date_End: int # YYYYMMDD or 0 (mode 3)
+        Slot_Number:
+          type: int
+          description: Slot 1-12. Slot 1 has the highest priority if windows overlap.
+          example: "1"
+        Start_Hour:
+          type: int
+          description: Window start hour (0-23).
+          example: "23"
+        Start_Minute:
+          type: int
+          description: Window start minute (0-59).
+          example: "0"
+        End_Hour:
+          type: int
+          description: Window end hour (0-23).
+          example: "5"
+        End_Minute:
+          type: int
+          description: Window end minute (0-59).
+          example: "30"
+        Operation_Mode:
+          type: int
+          description: 1 = Charge, 2 = Discharge.
+          example: "1"
+        Power_Limit_Watts:
+          type: int
+          description: 0-${inverter_max_power}. 0 = unlimited.
+          example: "0"
+        Target_SOC_Percent:
+          type: int
+          description: Target battery SOC (0-100).
+          example: "100"
+        Repeat_Daily:
+          type: bool
+          description: Legacy fallback when Repeat_Mode and date fields are all zero.
+          example: "true"
+        Auto_Pause_On_Target:
+          type: bool
+          description: Pause the slot when the SOC target is reached.
+          example: "false"
+        Repeat_Mode:
+          type: int
+          description: 0 = Daily, 1 = Selected days, 2 = Once, 3 = Date range.
+          example: "0"
+        Selected_Days:
+          type: int
+          description: Bitmask for mode 1. bit0 = Monday .. bit6 = Sunday.
+          example: "0"
+        Date_Start:
+          type: int
+          description: YYYYMMDD, or 0 if unused.
+          example: "0"
+        Date_End:
+          type: int
+          description: YYYYMMDD for date-range mode, or 0 if unused.
+          example: "0"
       then:
         - if:
             condition:
@@ -135,9 +182,16 @@ api:
               - api.respond: { success: true }
 
     - action: inverter${inverter_id}_manage_slot_status
+      description: Delete, pause, or resume one schedule slot.
       variables:
-        Slot_Number: int
-        Instruction: int # 0=Delete, 1=Disable, 2=Reactivate
+        Slot_Number:
+          type: int
+          description: Slot 1-12.
+          example: "1"
+        Instruction:
+          type: int
+          description: 0 = Delete, 1 = Disable, 2 = Reactivate.
+          example: "1"
       then:
         - lambda: |-
             int i = Slot_Number - 1;
@@ -156,11 +210,13 @@ api:
         - script.execute: inverter${inverter_id}_push_schedules_to_ha
 
     - action: inverter${inverter_id}_delete_all_schedules
+      description: Wipe every schedule slot on this inverter.
       then:
         - script.execute: inverter${inverter_id}_wipe_all_slots
         - api.respond: { success: true }
 
     - action: inverter${inverter_id}_push_schedules
+      description: Push the current 12-slot schedule snapshot to Home Assistant.
       then:
         - script.execute: inverter${inverter_id}_push_schedules_to_ha
         - api.respond: { success: true }
@@ -321,7 +377,7 @@ script:
 
 sensor:
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_status
     id: inverter${inverter_id}_f_dis
     device_id: inverter_${inverter_id}
     name: "Force Battery Discharge Limit"
@@ -338,10 +394,9 @@ sensor:
     filters:
       multiply: 10
     entity_category: diagnostic
-    skip_updates: 10
 
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_status
     id: inverter${inverter_id}_r_chg
     device_id: inverter_${inverter_id}
     name: "Battery Charge Limit"
@@ -358,10 +413,9 @@ sensor:
     filters:
       multiply: 10
     entity_category: diagnostic
-    skip_updates: 10
 
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_status
     id: inverter${inverter_id}_r_dis
     device_id: inverter_${inverter_id}
     name: "Battery Discharge Limit"
@@ -378,11 +432,9 @@ sensor:
     filters:
       multiply: 10
     entity_category: diagnostic
-    register_count: 4
-    skip_updates: 10
 
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_status
     id: inverter${inverter_id}_f_chg
     device_id: inverter_${inverter_id}
     name: "Force Battery Charge Limit"
@@ -399,20 +451,19 @@ sensor:
     filters:
       multiply: 10
     entity_category: diagnostic
-    skip_updates: 10
 
 select:
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_status
     internal: true
     id: inverter${inverter_id}_battery_force_mode_select
     address: 43135
     value_type: U_WORD
+    reuse_previous_range: true
     optionsmap:
       "Off": 0
       "Force Charge": 1
       "Force Discharge": 2
-    skip_updates: 10
     on_value:
       then:
         - lambda: |-
@@ -714,8 +765,7 @@ interval:
 
           auto update_reg = [&](int reg, int target, int &shadow) {
             if (shadow != -1 && target != shadow) {
-              auto cmd = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(inverter${inverter_id}_modbus_controller, reg, target);
-              inverter${inverter_id}_modbus_controller->queue_command(cmd);
+              id(inverter${inverter_id}_modbus_client).write_single_register(reg, (uint16_t) target);
               shadow = target; 
             }
           };
