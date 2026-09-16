@@ -264,6 +264,7 @@ sensor:
     unit_of_measurement: W
     filters:
       - lambda: return x * id(inverter${inverter_id}_pv1_a).state;
+      - round: 0
     accuracy_decimals: 0
     id: inverter${inverter_id}_pv1_w
 
@@ -321,6 +322,7 @@ sensor:
     unit_of_measurement: W
     filters:
       - lambda: return x * id(inverter${inverter_id}_pv2_a).state;
+      - round: 0
     accuracy_decimals: 0
     id: inverter${inverter_id}_pv2_w
 
@@ -609,8 +611,10 @@ sensor:
     register_type: read
     address: 33251
     value_type: U_WORD
+    accuracy_decimals: 1
     filters:
       - multiply: 0.1
+      - round: 1
 
   - platform: modbus_controller
     modbus_controller_id: inverter${inverter_id}_modbus_input
@@ -622,8 +626,10 @@ sensor:
     register_type: read
     address: 33252
     value_type: U_WORD
+    accuracy_decimals: 2
     filters:
       - multiply: 0.01
+      - round: 2
 
   - platform: modbus_controller
     modbus_controller_id: inverter${inverter_id}_modbus_input
@@ -665,8 +671,10 @@ sensor:
     register_type: read
     address: 33283
     value_type: U_DWORD
+    accuracy_decimals: 2
     filters:
       - multiply: 0.01
+      - round: 2
 
   - platform: modbus_controller
     modbus_controller_id: inverter${inverter_id}_modbus_input
@@ -678,8 +686,10 @@ sensor:
     register_type: read
     address: 33285
     value_type: U_DWORD
+    accuracy_decimals: 2
     filters:
       - multiply: 0.01
+      - round: 2
 
   - platform: modbus_controller
     modbus_controller_id: inverter${inverter_id}_modbus_input
