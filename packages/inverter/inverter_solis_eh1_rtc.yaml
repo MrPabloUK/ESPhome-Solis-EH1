@@ -28,16 +28,14 @@ switch:
 
 text_sensor:
   - platform: modbus_controller
-    modbus_controller_id: inverter${inverter_id}_modbus_controller
+    modbus_controller_id: inverter${inverter_id}_modbus_holding
     id: inverter${inverter_id}_rtc
     register_type: holding
     address: 43000
-    register_count: 6
     response_size: 12
     raw_encode: HEXBYTES
     entity_category: diagnostic
     icon: mdi:clock-digital
-    skip_updates: 60
     lambda: |-
       // Parse inverter RTC registers into wall-clock values
       int inv_year  = modbus::helpers::word_from_hex_str(x, 0) + 2000;
@@ -70,7 +68,7 @@ text_sensor:
             s_espt.year, s_espt.month, s_espt.day_of_month, deviation);
 
           if (abs(deviation) > 42 || date_wrong) {
-            std::vector<uint16_t> rtc_data = {
+            uint16_t rtc_regs[] = {
               (uint16_t)(s_espt.year % 100),
               (uint16_t) s_espt.month,
               (uint16_t) s_espt.day_of_month,
@@ -78,9 +76,7 @@ text_sensor:
               (uint16_t) s_espt.minute,
               (uint16_t) s_espt.second
             };
-            auto set_rtc_command = modbus_controller::ModbusCommandItem::create_write_multiple_command(
-              inverter${inverter_id}_modbus_controller, item->start_address, item->register_count, rtc_data);
-            inverter${inverter_id}_modbus_controller->queue_command(set_rtc_command);
+            id(inverter${inverter_id}_modbus_client).write_multiple_registers(43000, rtc_regs);
             ESP_LOGI("SyncInverterRTC", "Inverter RTC updated to %02d:%02d:%02d %04d-%02d-%02d (deviation was %ds)",
               s_espt.hour, s_espt.minute, s_espt.second,
               s_espt.year, s_espt.month, s_espt.day_of_month, deviation);

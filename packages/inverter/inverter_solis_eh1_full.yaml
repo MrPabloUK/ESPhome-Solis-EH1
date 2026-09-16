@@ -1,5 +1,5 @@
-# Updated : 2026.01.22
-# Version : 1.0.0
+# Updated : 2026.09.16
+# Version : 1.3.0
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 
 # Solis EH1 Controller
@@ -18,16 +18,30 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
 
 modbus_controller:
+  # Input ranges stream continuously; update_interval is recovery only.
+  # Holding stays 10s one-shot so status/config/RTC do not fill the bus.
   - id: inverter${inverter_id}_modbus_controller
     modbus_id: ${inverter_modbus_id}
     address: ${inverter_modbus_address}
     update_interval: ${inverter_update_interval}
+    continuous: true
+    setup_priority: -10
+    max_cmd_retries: 4
+    # 5s re-arm; skip 1 => probe every ~10s when offline (was ~11s at 1s/skip 10)
+    offline_skip_updates: 1
+  - id: inverter${inverter_id}_modbus_holding
+    modbus_id: ${inverter_modbus_id}
+    address: ${inverter_modbus_address}
+    update_interval: 10s
     setup_priority: -10
     max_cmd_retries: 1
-    offline_skip_updates: 10
-    # 1s is tight at 9600 baud. Holding/config registers must use
-    # skip_updates so only the three input-register blocks
-    # (33029/33133/33251) run every cycle. Use 2s if duplicates persist.
+    # skip 1 => probe every ~20s (was ~110s at skip 10)
+    offline_skip_updates: 1
+
+modbus_client:
+  - id: inverter${inverter_id}_modbus_client
+    modbus_id: ${inverter_modbus_id}
+    address: ${inverter_modbus_address}
 
 packages:
   inverter_sensors: !include inverter_solis_eh1_sensors.yaml
