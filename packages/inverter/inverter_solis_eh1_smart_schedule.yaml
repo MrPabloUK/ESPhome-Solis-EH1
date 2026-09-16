@@ -57,59 +57,59 @@ api:
         Slot_Number:
           type: int
           description: Slot 1-12. Slot 1 has the highest priority if windows overlap.
-          example: 1
+          example: "1"
         Start_Hour:
           type: int
           description: Window start hour (0-23).
-          example: 23
+          example: "23"
         Start_Minute:
           type: int
           description: Window start minute (0-59).
-          example: 0
+          example: "0"
         End_Hour:
           type: int
           description: Window end hour (0-23).
-          example: 5
+          example: "5"
         End_Minute:
           type: int
           description: Window end minute (0-59).
-          example: 30
+          example: "30"
         Operation_Mode:
           type: int
           description: 1 = Charge, 2 = Discharge.
-          example: 1
+          example: "1"
         Power_Limit_Watts:
           type: int
           description: 0-${inverter_max_power}. 0 = unlimited.
-          example: 0
+          example: "0"
         Target_SOC_Percent:
           type: int
           description: Target battery SOC (0-100).
-          example: 100
+          example: "100"
         Repeat_Daily:
           type: bool
           description: Legacy fallback when Repeat_Mode and date fields are all zero.
-          example: true
+          example: "true"
         Auto_Pause_On_Target:
           type: bool
           description: Pause the slot when the SOC target is reached.
-          example: false
+          example: "false"
         Repeat_Mode:
           type: int
           description: 0 = Daily, 1 = Selected days, 2 = Once, 3 = Date range.
-          example: 0
+          example: "0"
         Selected_Days:
           type: int
           description: Bitmask for mode 1. bit0 = Monday .. bit6 = Sunday.
-          example: 0
+          example: "0"
         Date_Start:
           type: int
           description: YYYYMMDD, or 0 if unused.
-          example: 0
+          example: "0"
         Date_End:
           type: int
           description: YYYYMMDD for date-range mode, or 0 if unused.
-          example: 0
+          example: "0"
       then:
         - if:
             condition:
@@ -186,11 +186,11 @@ api:
         Slot_Number:
           type: int
           description: Slot 1-12.
-          example: 1
+          example: "1"
         Instruction:
           type: int
           description: 0 = Delete, 1 = Disable, 2 = Reactivate.
-          example: 1
+          example: "1"
       then:
         - lambda: |-
             int i = Slot_Number - 1;
