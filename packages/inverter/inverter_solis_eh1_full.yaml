@@ -19,17 +19,18 @@
 
 modbus_controller:
   # Three hubs, same slave: named by what they poll, not by Modbus function code.
-  # _input    — live telemetry; continuous, 5s is re-arm/recovery only.
+  # _input    — live telemetry. continuous true: stream; interval is re-arm only.
+  #             continuous false: one-shot poll at inverter_update_interval.
   # _status   — faults, storage bits, schedule shadows; 10s one-shot.
   # _config   — RTC, power switch, output limit; 60s one-shot.
   - id: inverter${inverter_id}_modbus_input
     modbus_id: ${inverter_modbus_id}
     address: ${inverter_modbus_address}
     update_interval: ${inverter_update_interval}
-    continuous: true
+    continuous: ${inverter_continuous}
     setup_priority: -10
     max_cmd_retries: 4
-    # 5s re-arm; skip 1 => probe every ~10s when offline (was ~11s at 1s/skip 10)
+    # skip 1 => probe every (skip+1)×update_interval when offline
     offline_skip_updates: 1
   - id: inverter${inverter_id}_modbus_status
     modbus_id: ${inverter_modbus_id}

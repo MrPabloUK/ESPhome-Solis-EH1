@@ -3,7 +3,7 @@
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 #
 # Changelog:
-#   1.3.0 - ESPHome 2026.9: _modbus_input continuous (5s re-arm),
+#   1.3.0 - ESPHome 2026.9: _modbus_input (inverter_continuous + interval),
 #           _modbus_status at 10s, _modbus_config at 60s (RTC/config),
 #           reuse_previous_range, modbus_client writes, native API
 #           action description/example metadata.
