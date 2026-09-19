@@ -51,3 +51,33 @@ def usable_esphome_name(value: str | None) -> str | None:
 def esphome_action_service(prefix: str, action: str) -> str:
     """HA registers ESPHome user actions with '-' in the node name replaced by '_'."""
     return f"{prefix.replace('-', '_')}_{action}"
+
+
+def resolve_esphome_action_name(prefix: str, action: str, available: set[str]) -> str | None:
+    """Pick the registered ESPHome user action, even if the stored hostname is stale."""
+    preferred = esphome_action_service(prefix, action)
+    raw = f"{prefix}_{action}"
+    for candidate in (preferred, raw):
+        if candidate in available:
+            return candidate
+
+    suffix = f"_{action}"
+    matches = sorted(name for name in available if name.endswith(suffix))
+    if not matches:
+        return None
+
+    host = prefix.replace("-", "_")
+    inverter = ""
+    if "_inverter" in host:
+        host, inverter = host.rsplit("_inverter", 1)
+        inverter = f"_inverter{inverter}"
+    prefixed = [name for name in matches if name.startswith(f"{host}_") or name.startswith(f"{host}{inverter}_")]
+    if len(prefixed) == 1:
+        return prefixed[0]
+    if len(matches) == 1:
+        return matches[0]
+    if inverter:
+        keyed = [name for name in matches if inverter in f"_{name}_" or name.endswith(f"{inverter}{suffix}")]
+        if len(keyed) == 1:
+            return keyed[0]
+    return None

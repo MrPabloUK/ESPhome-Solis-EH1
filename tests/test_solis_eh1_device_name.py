@@ -14,6 +14,7 @@ from names import (  # noqa: E402
     has_esphome_identifier,
     looks_like_mac,
     looks_like_subdevice_ident,
+    resolve_esphome_action_name,
     usable_esphome_name,
 )
 
@@ -43,6 +44,17 @@ class DeviceNameTests(unittest.TestCase):
         self.assertEqual(
             esphome_action_service("solisinverter_inverter1", "push_schedules"),
             "solisinverter_inverter1_push_schedules",
+        )
+
+    def test_resolve_uses_registered_underscore_name(self) -> None:
+        available = {"sb_solisinverter_inverter1_upsert_schedule"}
+        self.assertEqual(
+            resolve_esphome_action_name("sb-solisinverter_inverter1", "upsert_schedule", available),
+            "sb_solisinverter_inverter1_upsert_schedule",
+        )
+        self.assertEqual(
+            resolve_esphome_action_name("solisinverter_inverter1", "upsert_schedule", available),
+            "sb_solisinverter_inverter1_upsert_schedule",
         )
 
     def test_long_identifier_tuples(self) -> None:

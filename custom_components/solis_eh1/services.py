@@ -25,7 +25,7 @@ from .const import (
     SERVICE_UPSERT,
 )
 from .mapping import MappingError, manage_payload, upsert_payload
-from .names import esphome_action_service, identifier_domain, identifier_value
+from .names import esphome_action_service, identifier_domain, identifier_value, resolve_esphome_action_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -102,13 +102,23 @@ async def async_request_snapshot(hass: HomeAssistant, prefix: str) -> None:
     await _call_esphome(hass, prefix, ESPHOME_PUSH)
 
 
+def _esphome_service_names(hass: HomeAssistant) -> set[str]:
+    lookup = getattr(hass.services, "async_services_for_domain", None)
+    if callable(lookup):
+        return set(lookup("esphome"))
+    return set(hass.services.async_services().get("esphome", {}))
+
+
 async def _call_esphome(hass: HomeAssistant, prefix: str, action: str, data: dict[str, Any] | None = None) -> None:
-    service = esphome_action_service(prefix, action)
+    available = _esphome_service_names(hass)
+    service = resolve_esphome_action_name(prefix, action, available) or esphome_action_service(prefix, action)
     try:
         await hass.services.async_call("esphome", service, data or {}, blocking=True)
     except ServiceNotFound as err:
+        hint = ", ".join(sorted(name for name in available if name.endswith(f"_{action}"))) or "none registered"
         raise HomeAssistantError(
-            f"ESPHome action esphome.{service} is not available. Is the stick adopted and online?"
+            f"ESPHome action esphome.{service} is not available (found: {hint}). "
+            "Update the Solis EH1 integration and fully restart Home Assistant."
         ) from err
 
 
