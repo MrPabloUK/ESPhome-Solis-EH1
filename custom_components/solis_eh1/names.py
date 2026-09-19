@@ -46,3 +46,8 @@ def usable_esphome_name(value: str | None) -> str | None:
     if not _HOSTNAME_RE.match(name):
         return None
     return name
+
+
+def esphome_action_service(prefix: str, action: str) -> str:
+    """HA registers ESPHome user actions with '-' in the node name replaced by '_'."""
+    return f"{prefix.replace('-', '_')}_{action}"

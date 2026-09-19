@@ -25,7 +25,7 @@ from .const import (
     SERVICE_UPSERT,
 )
 from .mapping import MappingError, manage_payload, upsert_payload
-from .names import identifier_domain, identifier_value
+from .names import esphome_action_service, identifier_domain, identifier_value
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ async def async_request_snapshot(hass: HomeAssistant, prefix: str) -> None:
 
 
 async def _call_esphome(hass: HomeAssistant, prefix: str, action: str, data: dict[str, Any] | None = None) -> None:
-    service = f"{prefix}_{action}"
+    service = esphome_action_service(prefix, action)
     try:
         await hass.services.async_call("esphome", service, data or {}, blocking=True)
     except ServiceNotFound as err:

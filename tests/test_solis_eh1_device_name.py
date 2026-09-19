@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "custom_components" / "solis_eh1"))
 
 from names import (  # noqa: E402
+    esphome_action_service,
     has_esphome_identifier,
     looks_like_mac,
     looks_like_subdevice_ident,
@@ -33,6 +34,16 @@ class DeviceNameTests(unittest.TestCase):
         self.assertIsNone(usable_esphome_name("aabbccddeeff"))
         self.assertIsNone(usable_esphome_name("aabbccddeeff_inverter_1"))
         self.assertIsNone(usable_esphome_name("Solis Controller"))
+
+    def test_esphome_action_service_slugifies_hyphens(self) -> None:
+        self.assertEqual(
+            esphome_action_service("sb-solisinverter_inverter1", "upsert_schedule"),
+            "sb_solisinverter_inverter1_upsert_schedule",
+        )
+        self.assertEqual(
+            esphome_action_service("solisinverter_inverter1", "push_schedules"),
+            "solisinverter_inverter1_push_schedules",
+        )
 
     def test_long_identifier_tuples(self) -> None:
         self.assertTrue(has_esphome_identifier({("esphome", "solisinverter")}))
