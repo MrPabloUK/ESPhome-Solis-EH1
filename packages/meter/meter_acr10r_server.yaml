@@ -1,5 +1,5 @@
 # Updated : 2026.10.14
-# Version : 1.0.2
+# Version : 1.0.3
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 
 # Solis EH1 Controller
@@ -50,6 +50,17 @@ modbus_server:
       register_last_address: 64
       register_value: 0
     registers:
+      # Fixed words from a listen of the real ACR10R reply to 01 03 00 00 00 41.
+      # Courtesy zeros cover every other address through 64.
+      - address: 0
+        value_type: U_WORD
+        read_lambda: 'return 0x0011;'
+      - address: 1
+        value_type: U_WORD
+        read_lambda: 'return 0xC958;'
+      - address: 10
+        value_type: U_WORD
+        read_lambda: 'return 0x0001;'
       - address: 11
         value_type: U_WORD
         read_lambda: |-
@@ -88,6 +99,15 @@ modbus_server:
         read_lambda: |-
           if (isnan(id(${meter_id}_frequency_raw).state)) return {};
           return (uint16_t) id(${meter_id}_frequency_raw).state;
+      - address: 21
+        value_type: U_WORD
+        read_lambda: 'return 0x0101;'
+      - address: 34
+        value_type: U_WORD
+        read_lambda: 'return 0x0001;'
+      - address: 35
+        value_type: U_WORD
+        read_lambda: 'return 0x0001;'
       - address: 60
         value_type: S_DWORD
         read_lambda: |-
@@ -98,6 +118,9 @@ modbus_server:
         read_lambda: |-
           if (isnan(id(${meter_id}_export_energy_raw).state)) return {};
           return (int32_t) id(${meter_id}_export_energy_raw).state;
+      - address: 64
+        value_type: U_WORD
+        read_lambda: 'return 0x0007;'
 
 sensor:
   - platform: template
