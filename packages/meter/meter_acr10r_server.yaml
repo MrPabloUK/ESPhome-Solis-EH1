@@ -1,5 +1,5 @@
 # Updated : 2026.10.14
-# Version : 1.0.1
+# Version : 1.0.2
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 
 # Solis EH1 Controller
@@ -30,6 +30,7 @@ number:
   - platform: template
     name: "${meter_name} Inverter power bias"
     id: ${meter_id}_power_bias
+    device_id: device_${meter_id}
     entity_category: config
     optimistic: true
     restore_value: true
@@ -100,6 +101,7 @@ modbus_server:
 
 sensor:
   - platform: template
+    device_id: device_${meter_id}
     name: "${meter_name} Power Sent"
     update_interval: 1s
     unit_of_measurement: W

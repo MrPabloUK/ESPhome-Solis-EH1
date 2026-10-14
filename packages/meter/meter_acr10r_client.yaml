@@ -1,5 +1,5 @@
 # Updated : 2026.10.14
-# Version : 1.0.0
+# Version : 1.0.1
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 
 # Solis EH1 Controller
@@ -18,6 +18,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
+
+esphome:
+  devices:
+    - id: device_${meter_id}
+      name: "${meter_name}"
 
 modbus_controller:
   - id: meter_${meter_id}
@@ -110,6 +115,7 @@ sensor:
     reuse_previous_range: true
 
   - platform: template
+    device_id: device_${meter_id}
     name: "${meter_name} Voltage"
     update_interval: 1s
     unit_of_measurement: V
@@ -121,6 +127,7 @@ sensor:
       return id(${meter_id}_voltage_raw).state * 0.1;
 
   - platform: template
+    device_id: device_${meter_id}
     name: "${meter_name} Current"
     update_interval: 1s
     unit_of_measurement: A
@@ -132,6 +139,7 @@ sensor:
       return id(${meter_id}_current_raw).state * 0.01;
 
   - platform: template
+    device_id: device_${meter_id}
     name: "${meter_name} Power"
     update_interval: 1s
     unit_of_measurement: W
@@ -143,6 +151,7 @@ sensor:
       return -id(${meter_id}_power_raw).state;
 
   - platform: template
+    device_id: device_${meter_id}
     name: "${meter_name} Reactive Power"
     update_interval: 1s
     unit_of_measurement: var
@@ -154,6 +163,7 @@ sensor:
       return id(${meter_id}_reactive_raw).state;
 
   - platform: template
+    device_id: device_${meter_id}
     name: "${meter_name} Apparent Power"
     update_interval: 1s
     unit_of_measurement: VA
@@ -165,6 +175,7 @@ sensor:
       return id(${meter_id}_apparent_raw).state;
 
   - platform: template
+    device_id: device_${meter_id}
     name: "${meter_name} Power Factor"
     update_interval: 1s
     device_class: power_factor
@@ -175,6 +186,7 @@ sensor:
       return id(${meter_id}_power_factor_raw).state * 0.01;
 
   - platform: template
+    device_id: device_${meter_id}
     name: "${meter_name} Frequency"
     update_interval: 1s
     unit_of_measurement: Hz
@@ -186,6 +198,7 @@ sensor:
       return id(${meter_id}_frequency_raw).state * 0.01;
 
   - platform: template
+    device_id: device_${meter_id}
     name: "${meter_name} Import Energy"
     update_interval: 1s
     unit_of_measurement: kWh
@@ -197,6 +210,7 @@ sensor:
       return id(${meter_id}_import_energy_raw).state * 0.01;
 
   - platform: template
+    device_id: device_${meter_id}
     name: "${meter_name} Export Energy"
     update_interval: 1s
     unit_of_measurement: kWh
