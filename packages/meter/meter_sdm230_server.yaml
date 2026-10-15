@@ -1,0 +1,120 @@
+# Updated : 2026.10.15
+# Version : 1.0.0
+# GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
+
+# Solis EH1 Controller
+# Answers the inverter meter port as an Eastron SDM230 1-phase meter at address 1
+# using data read by meter_acr10r_client.yaml. Positive bias makes the inverter generate more.
+
+# This YAML is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation, either version 3
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/gpl.html>.
+
+# The Modbus interface package adds these keys to every hub. ESPHome rejects
+# them when role is server (esphome/esphome#11969).
+modbus:
+  - id: !extend ${inverter_meter_modbus_id}
+    send_wait_time: !remove
+    turnaround_time: !remove
+
+number:
+  - platform: template
+    name: "${meter_name} Inverter power bias"
+    id: ${meter_id}_power_bias
+    device_id: device_${meter_id}
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+    min_value: -2000
+    max_value: 2000
+    step: 1
+    unit_of_measurement: W
+    mode: box
+
+modbus_server:
+  - id: solis_meter_${meter_id}
+    modbus_id: ${inverter_meter_modbus_id}
+    address: 1
+    courtesy_response:
+      enabled: true
+      register_last_address: 390
+      register_value: 0
+    registers:
+      # Eastron SDM120 / SDM230 IEEE-754 float register map (served to FC 03 and FC 04).
+      - address: 0
+        value_type: FP32
+        read_lambda: |-
+          if (isnan(id(${meter_id}_voltage_raw).state)) return {};
+          return id(${meter_id}_voltage_raw).state * 0.1f;
+      - address: 6
+        value_type: FP32
+        read_lambda: |-
+          if (isnan(id(${meter_id}_current_raw).state)) return {};
+          return id(${meter_id}_current_raw).state * 0.01f;
+      - address: 12
+        value_type: FP32
+        read_lambda: |-
+          if (isnan(id(${meter_id}_power_raw).state)) return {};
+          return id(${meter_id}_power_raw).state - id(${meter_id}_power_bias).state;
+      - address: 18
+        value_type: FP32
+        read_lambda: |-
+          if (isnan(id(${meter_id}_apparent_raw).state)) return {};
+          return id(${meter_id}_apparent_raw).state;
+      - address: 24
+        value_type: FP32
+        read_lambda: |-
+          if (isnan(id(${meter_id}_reactive_raw).state)) return {};
+          return id(${meter_id}_reactive_raw).state;
+      - address: 30
+        value_type: FP32
+        read_lambda: |-
+          if (isnan(id(${meter_id}_power_factor_raw).state)) return {};
+          return id(${meter_id}_power_factor_raw).state * 0.01f;
+      - address: 36
+        value_type: FP32
+        read_lambda: 'return 0.0f;'
+      - address: 70
+        value_type: FP32
+        read_lambda: |-
+          if (isnan(id(${meter_id}_frequency_raw).state)) return {};
+          return id(${meter_id}_frequency_raw).state * 0.01f;
+      - address: 72
+        value_type: FP32
+        read_lambda: |-
+          if (isnan(id(${meter_id}_import_energy_raw).state)) return {};
+          return id(${meter_id}_import_energy_raw).state * 0.01f;
+      - address: 74
+        value_type: FP32
+        read_lambda: |-
+          if (isnan(id(${meter_id}_export_energy_raw).state)) return {};
+          return id(${meter_id}_export_energy_raw).state * 0.01f;
+      - address: 342
+        value_type: FP32
+        read_lambda: |-
+          if (isnan(id(${meter_id}_import_energy_raw).state) || isnan(id(${meter_id}_export_energy_raw).state)) return {};
+          return (id(${meter_id}_import_energy_raw).state + id(${meter_id}_export_energy_raw).state) * 0.01f;
+
+sensor:
+  - platform: template
+    device_id: device_${meter_id}
+    name: "${meter_name} Power Sent"
+    update_interval: 1s
+    unit_of_measurement: W
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: |-
+      if (isnan(id(${meter_id}_power_raw).state)) return {};
+      float sent = id(${meter_id}_power_raw).state - id(${meter_id}_power_bias).state;
+      return -sent;
