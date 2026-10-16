@@ -1,5 +1,5 @@
-# Updated : 2026.10.14
-# Version : 1.0.1
+# Updated : 2026.10.16
+# Version : 1.0.2
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 
 # Solis EH1 Controller
@@ -29,11 +29,19 @@ modbus_controller:
     modbus_id: ${meter_modbus_id}
     address: ${meter_address}
     continuous: true
-    update_interval: 15s
+    update_interval: 1s
     max_cmd_retries: 1
     offline_skip_updates: 3
 
 sensor:
+  - platform: modbus_controller
+    id: ${meter_id}_total_energy_raw
+    modbus_controller_id: meter_${meter_id}
+    internal: true
+    register_type: holding
+    address: 0
+    value_type: S_DWORD
+
   - platform: modbus_controller
     id: ${meter_id}_voltage_raw
     modbus_controller_id: meter_${meter_id}
@@ -41,6 +49,7 @@ sensor:
     register_type: holding
     address: 11
     value_type: U_WORD
+    reuse_previous_range: true
 
   - platform: modbus_controller
     id: ${meter_id}_current_raw
@@ -112,6 +121,15 @@ sensor:
     register_type: holding
     address: 62
     value_type: S_DWORD
+    reuse_previous_range: true
+
+  - platform: modbus_controller
+    id: ${meter_id}_status_64_raw
+    modbus_controller_id: meter_${meter_id}
+    internal: true
+    register_type: holding
+    address: 64
+    value_type: U_WORD
     reuse_previous_range: true
 
   - platform: template
