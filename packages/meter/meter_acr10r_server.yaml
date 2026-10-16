@@ -1,5 +1,5 @@
 # Updated : 2026.10.16
-# Version : 1.0.5
+# Version : 1.0.6
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 
 # Solis EH1 Controller
@@ -56,7 +56,6 @@ modbus_server:
         value_type: S_DWORD
         read_lambda: |-
           if (isnan(id(${meter_id}_total_energy_raw).state)) return {};
-          delay(20);
           return (int32_t) id(${meter_id}_total_energy_raw).state;
       - address: 10
         value_type: U_WORD
