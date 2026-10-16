@@ -1,5 +1,5 @@
 # Updated : 2026.10.16
-# Version : 1.0.2
+# Version : 1.0.3
 # GitHub  : https://github.com/MrPabloUK/ESPhome-Solis-EH1
 
 # Solis EH1 Controller
@@ -28,7 +28,6 @@ modbus_controller:
   - id: meter_${meter_id}
     modbus_id: ${meter_modbus_id}
     address: ${meter_address}
-    continuous: true
     update_interval: 1s
     max_cmd_retries: 1
     offline_skip_updates: 3
