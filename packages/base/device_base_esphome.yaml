@@ -26,4 +26,4 @@ esphome:
   project:
     name: MrPabloUK.Solis-EH1-Controller
     version: ${code_version}
-  min_version: 2026.9.0
+  min_version: 2026.11.0
